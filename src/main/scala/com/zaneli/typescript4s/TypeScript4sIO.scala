@@ -12,10 +12,8 @@ private[typescript4s] object TypeScript4sIO extends Logging {
 
   private[this] lazy val executingFilePath = TypeScript4sIO.getClass.getResource("/tsc/tsc.js").getPath
 
-  private[this] lazy val defaultLibFileDir = new File(new File(executingFilePath).getParentFile, "lib.d.ts")
-
   def contents(fileName: String): String = {
-    if (new File(fileName) == defaultLibFileDir) {
+    if (fileName.endsWith("/tsc/lib.d.ts")) {
       defaultLibContents
     } else {
       FileUtils.readFileToString(new File(fileName))
