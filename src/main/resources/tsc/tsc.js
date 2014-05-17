@@ -62924,6 +62924,6 @@ var TypeScript;
     })();
     TypeScript.BatchCompiler = BatchCompiler;
 
-    var batch = new TypeScript.BatchCompiler(TypeScript.IO);
-    batch.batchCompile();
+    // var batch = new TypeScript.BatchCompiler(TypeScript.IO);
+    // batch.batchCompile();
 })(TypeScript || (TypeScript = {}));
