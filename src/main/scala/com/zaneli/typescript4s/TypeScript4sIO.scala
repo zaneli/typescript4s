@@ -60,5 +60,3 @@ private[typescript4s] object TypeScript4sIO extends Logging {
     }
   }
 }
-
-class TypeScriptCompilerException(messages: String) extends Exception(messages)

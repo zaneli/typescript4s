@@ -37,7 +37,11 @@ object TypeScriptCompiler {
   }
   def compile(src: File, options: CompileOptions): File = {
     execute(options.mkArgs(src): _*)
-    new File(scope.get("ts4sCompiledFilePath", scope).toString)
+    val dest = getDestFilePath(src, options)
+    if (!dest.isFile) {
+      throw new TypeScriptCompilerException(s"${dest.getAbsolutePath} file not found.")
+    }
+    dest
   }
 
   def help(): Unit = {
@@ -54,6 +58,16 @@ object TypeScriptCompiler {
       scope.put("ts4sargs", scope, ts4sargs)
       cx.evaluateString(scope, jsCodes, "compile.js", 1, null)
     }
+  }
+
+  private[this] def getDestFilePath(src: File, options: CompileOptions): File = (options.outOpt, options.outDirOpt) match {
+    case (Some(file), _) => file
+    case (_, Some(dir)) => getDestFilePath(dir, src)
+    case _ => getDestFilePath(src.getParentFile, src)
+  }
+
+  private[this] def getDestFilePath(dir: File, src: File): File = {
+    new File(dir, src.getName.split("""\.""").init.mkString(".") + ".js")
   }
 
   private[this] def withContext[A](f: Context => A): A = try {
@@ -99,7 +113,6 @@ object TypeScriptCompiler {
       },
       writeFile: function(path, contents, writeByteOrderMark) {
         ts4sIO.writeFile(path, contents);
-        ts4sCompiledFilePath = path
       },
       stderr: {
         Write: function(log) {
@@ -114,3 +127,5 @@ object TypeScriptCompiler {
     batch.batchCompile();
     """
 }
+
+class TypeScriptCompilerException(messages: String) extends Exception(messages)

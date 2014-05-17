@@ -76,6 +76,20 @@ class TypeScriptCompilerSpec extends Specification {
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
         getContents(actualDest) must_== getContents("/js/standalone.js")
       }
+      "declaration" in new context {
+        val src = getPath("/ts/with-declaration.ts")
+        val expectedDestJs = getDestJsPath(src)
+        val expectedDestDts = new File(expectedDestJs.getParent, "with-declaration.d.ts")
+        destFiles += expectedDestJs
+        destFiles += expectedDestDts
+        expectedDestJs.exists must beFalse
+        expectedDestDts.exists must beFalse
+
+        val actualDest = TypeScriptCompiler.compile(src, declaration = true)
+        actualDest.getAbsolutePath must_== expectedDestJs.getAbsolutePath
+        getContents(actualDest) must_== getContents("/js/with-declaration.js")
+        getContents(expectedDestDts) must_== getContents("/ts/typings/with-declaration.d.ts")
+      }
     }
   }
 
