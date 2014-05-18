@@ -2,22 +2,27 @@ package com.zaneli.typescript4s
 
 import java.io.File
 import org.apache.commons.io.{ FileUtils, IOUtils }
+import org.mozilla.javascript.{ Context, Scriptable, ScriptableObject }
 import org.slf4s.Logging
 
-private[typescript4s] object TypeScript4sIO extends Logging {
+private[typescript4s] class TypeScript4sIO(cx: Context, scope: Scriptable) extends Logging {
 
-  lazy val byteOrderMark = "TypeScript.ByteOrderMark.None"
+  private[this] lazy val byteOrderMarkNone = 0 // "TypeScript.ByteOrderMark.None"
 
-  private[this] lazy val defaultLibContents = IOUtils.toString(TypeScript4sIO.getClass.getResourceAsStream("/tsc/lib.d.ts"))
+  private[this] lazy val defaultLibContents = IOUtils.toString(this.getClass.getResourceAsStream("/tsc/lib.d.ts"))
 
-  private[this] lazy val executingFilePath = TypeScript4sIO.getClass.getResource("/tsc/tsc.js").getPath
+  private[this] lazy val executingFilePath = this.getClass.getResource("/tsc/tsc.js").getPath
 
-  def contents(fileName: String): String = {
-    if (fileName.endsWith("/tsc/lib.d.ts")) {
+  def readFile(fileName: String): Scriptable = {
+    val contents = if (fileName.endsWith("/tsc/lib.d.ts")) {
       defaultLibContents
     } else {
       FileUtils.readFileToString(new File(fileName))
     }
+    val obj = cx.newObject(scope)
+    ScriptableObject.putProperty(obj, "contents", contents)
+    ScriptableObject.putProperty(obj, "byteOrderMark", byteOrderMarkNone)
+    obj
   }
 
   def getExecutingFilePath(): String = {

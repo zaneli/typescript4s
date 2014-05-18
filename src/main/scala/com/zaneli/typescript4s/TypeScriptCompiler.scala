@@ -17,7 +17,7 @@ object TypeScriptCompiler {
     val scope = cx.initStandardObjects(global)
     cx.evaluateReader(scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream("/tsc/tsc.js")), "tsc.js", 1, null)
     scope.put("ts4sEnvironment", scope, TypeScript4sEnvironment)
-    scope.put("ts4sIO", scope, TypeScript4sIO)
+    scope.put("ts4sIO", scope, new TypeScript4sIO(cx, scope))
     scope
   }
 
@@ -106,10 +106,7 @@ object TypeScriptCompiler {
         return ts4sIO.directoryExists(file);
       },
       readFile: function(fileName) {
-        return {
-          contents: ts4sIO.contents(fileName) + '', // workaround: convert java string to js string (for access string.length property)
-          byteOrderMark: ts4sIO.byteOrderMark()
-        }
+        return ts4sIO.readFile(fileName);
       },
       writeFile: function(path, contents, writeByteOrderMark) {
         ts4sIO.writeFile(path, contents);
