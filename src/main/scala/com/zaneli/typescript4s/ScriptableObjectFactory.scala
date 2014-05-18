@@ -2,7 +2,8 @@ package com.zaneli.typescript4s
 
 import java.io.File
 import org.apache.commons.io.{ FileUtils, IOUtils }
-import org.mozilla.javascript.{ BaseFunction, Context, Scriptable, ScriptableObject, Undefined }
+import org.mozilla.javascript.{ BaseFunction, Context, Scriptable, Undefined }
+import org.mozilla.javascript.ScriptableObject.putProperty
 import org.slf4s.Logging
 
 object ScriptableObjectFactory extends Logging {
@@ -17,14 +18,11 @@ object ScriptableObjectFactory extends Logging {
   def createEnv(cx: Context, scope: Scriptable): Scriptable = {
     val ts4sEnv = cx.newObject(scope)
 
-    ScriptableObject.putProperty(ts4sEnv, "newLine", System.getProperty("line.separator"))
+    putProperty(ts4sEnv, "newLine", System.getProperty("line.separator"))
 
-    ScriptableObject.putProperty(ts4sEnv, "supportsCodePage", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        return java.lang.Boolean.FALSE
-      }
-      override def getArity = 0
-    })
+    putProperty(ts4sEnv, "supportsCodePage", function({ () =>
+      false
+    }))
 
     ts4sEnv
   }
@@ -33,103 +31,84 @@ object ScriptableObjectFactory extends Logging {
     val ts4sIO = cx.newObject(scope)
 
     val arguments = cx.newArray(scope, args.collect { case arg if arg.nonEmpty => arg.asInstanceOf[Object] }.toArray)
-    ScriptableObject.putProperty(ts4sIO, "arguments", arguments)
+    putProperty(ts4sIO, "arguments", arguments)
 
-    ScriptableObject.putProperty(ts4sIO, "getExecutingFilePath", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        return executingFilePath
-      }
-      override def getArity = 0
-    })
+    putProperty(ts4sIO, "getExecutingFilePath", function({ () =>
+      executingFilePath
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "resolvePath", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val path = args(0).toString
-        return new File(path).getAbsolutePath
-      }
-      override def getArity = 1
-    })
+    putProperty(ts4sIO, "resolvePath", function({ path =>
+      new File(path.toString).getAbsolutePath
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "dirName", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val path = args(0).toString
-        return new File(path).getAbsoluteFile.getParent
-      }
-      override def getArity = 1
-    })
+    putProperty(ts4sIO, "dirName", function({ path =>
+      new File(path.toString).getAbsoluteFile.getParent
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "fileExists", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val path = args(0).toString
-        Boolean.box(new File(path).isFile())
-      }
-      override def getArity = 1
-    })
+    putProperty(ts4sIO, "fileExists", function({ path =>
+      new File(path.toString).isFile()
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "directoryExists", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val path = args(0).toString
-        Boolean.box(new File(path).isDirectory())
-      }
-      override def getArity = 1
-    })
+    putProperty(ts4sIO, "directoryExists", function({ path =>
+      new File(path.toString).isDirectory()
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "readFile", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val fileName = args(0).toString
-        val contents = if (fileName.endsWith(defaultLibName)) {
-          defaultLibContents
-        } else {
-          FileUtils.readFileToString(new File(fileName))
-        }
-        val obj = cx.newObject(scope)
-        ScriptableObject.putProperty(obj, "contents", contents)
-        ScriptableObject.putProperty(obj, "byteOrderMark", byteOrderMarkNone)
-        obj
+    putProperty(ts4sIO, "readFile", function({ arg =>
+      val fileName = arg.toString
+      val contents = if (fileName.endsWith(defaultLibName)) {
+        defaultLibContents
+      } else {
+        FileUtils.readFileToString(new File(fileName))
       }
-      override def getArity = 1
-    })
+      val obj = cx.newObject(scope)
+      putProperty(obj, "contents", contents)
+      putProperty(obj, "byteOrderMark", byteOrderMarkNone)
+      obj
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "writeFile", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val path = args(0).toString
-        val contents = args(1).toString
-        FileUtils.writeStringToFile(new File(path), contents)
-        Undefined.instance
-      }
-      override def getArity = 3
-    })
+    putProperty(ts4sIO, "writeFile", function({ (path, contents, _) =>
+      FileUtils.writeStringToFile(new File(path.toString), contents.toString)
+    }))
 
-    ScriptableObject.putProperty(ts4sIO, "printLine", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val log = args(0).toString
-        println(log)
-        Undefined.instance
-      }
-      override def getArity = 1
-    })
+    putProperty(ts4sIO, "printLine", function({ msg =>
+      println(msg.toString)
+    }))
 
     val stderr = cx.newObject(scope)
-    ScriptableObject.putProperty(stderr, "Write", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val msg = args(0).toString
-        log.error(msg)
-        Undefined.instance
-      }
-      override def getArity = 1
-    })
-    ScriptableObject.putProperty(ts4sIO, "stderr", stderr)
+    putProperty(stderr, "Write", function({ msg =>
+      log.error(msg.toString)
+    }))
+    putProperty(ts4sIO, "stderr", stderr)
 
-    ScriptableObject.putProperty(ts4sIO, "quit", new BaseFunction() {
-      override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
-        val status = args(0).asInstanceOf[Double]
-        if (status == 1.0) {
-          throw new TypeScriptCompilerException("tsc quit with error")
-        }
-        Undefined.instance
+    putProperty(ts4sIO, "quit", function({ status =>
+      if (status.asInstanceOf[Double] == 1.0) {
+        throw new TypeScriptCompilerException("tsc quit with error")
       }
-      override def getArity = 1
-    })
+    }))
     ts4sIO
+  }
+
+  private[this] def function(f: () => Any): BaseFunction = {
+    function({ args => f() }, 0)
+  }
+
+  private[this] def function(f: (Object) => Any): BaseFunction = {
+    function({ args => f(args(0)) }, 1)
+  }
+
+  private[this] def function(f: (Object, Object, Object) => Any): BaseFunction = {
+    function({ args => f(args(0), args(1), args(2)) }, 3)
+  }
+
+  private[this] def function(f: (Array[Object]) => Any, arity: Int): BaseFunction = new BaseFunction() {
+    override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
+      f(args) match {
+        case b: Boolean => if (b) java.lang.Boolean.TRUE else java.lang.Boolean.FALSE
+        case _: Unit => Undefined.instance
+        case o: Object => o
+        case x => Context.toObject(x, scope)
+      }
+    }
+    override def getArity = arity
   }
 }
