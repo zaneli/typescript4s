@@ -15,9 +15,9 @@ object TypeScriptCompiler {
     cx.setLanguageVersion(Context.VERSION_1_7)
     global.init(cx)
     val scope = cx.initStandardObjects(global)
-    cx.evaluateReader(scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream("/tsc/tsc.js")), "tsc.js", 1, null)
-    scope.put("ts4sEnvironment", scope, TypeScript4sEnvironment)
-    scope.put("ts4sIO", scope, new TypeScript4sIO(cx, scope))
+    cx.evaluateReader(
+      scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream(ScriptableObjectFactory.executingName)), "tsc.js", 1, null)
+    scope.put(VarName.ts4sEnv, scope, ScriptableObjectFactory.createEnv(cx, scope))
     scope
   }
 
@@ -54,8 +54,7 @@ object TypeScriptCompiler {
 
   def execute(args: String*): Unit = synchronized {
     withContext { cx =>
-      val ts4sargs = cx.newArray(scope, args.collect { case arg if arg.nonEmpty => arg.asInstanceOf[Object] }.toArray)
-      scope.put("ts4sargs", scope, ts4sargs)
+      scope.put(VarName.ts4sIO, scope, ScriptableObjectFactory.createIO(cx, scope, args))
       cx.evaluateString(scope, jsCodes, "compile.js", 1, null)
     }
   }
@@ -78,51 +77,17 @@ object TypeScriptCompiler {
   }
 
   private[this] val jsCodes: String =
-    """
-    TypeScript.Environment = {
-      supportsCodePage: function() {
-        return ts4sEnvironment.supportsCodePage();
-      },
-      newLine: ts4sEnvironment.newLine()
-    };
-    TypeScript.IO = {
-      resolvePath: function(path) {
-        return ts4sIO.resolvePath(path) + ''; // workaround: convert java string to js string (for call string.replace() method)
-      },
-      getExecutingFilePath: function() {
-        return ts4sIO.getExecutingFilePath();
-      },
-      dirName: function(path) {
-        return ts4sIO.dirName(path);
-      },
-      arguments: ts4sargs,
-      printLine: function(log) {
-        ts4sIO.printLine(log);
-      },
-      fileExists: function(file) {
-        return ts4sIO.fileExists(file);
-      },
-      directoryExists: function(file) {
-        return ts4sIO.directoryExists(file);
-      },
-      readFile: function(fileName) {
-        return ts4sIO.readFile(fileName);
-      },
-      writeFile: function(path, contents, writeByteOrderMark) {
-        ts4sIO.writeFile(path, contents);
-      },
-      stderr: {
-        Write: function(log) {
-          ts4sIO.error(log);
-        }
-      },
-      quit: function(status) {
-        ts4sIO.quit(status);
-      }
-    };
+    s"""
+    TypeScript.Environment = ${VarName.ts4sEnv};
+    TypeScript.IO = ${VarName.ts4sIO};
     var batch = new TypeScript.BatchCompiler(TypeScript.IO);
     batch.batchCompile();
     """
+
+  private[this] object VarName {
+    val ts4sEnv = "ts4sEnv"
+    val ts4sIO = "ts4sIO"
+  }
 }
 
 class TypeScriptCompilerException(messages: String) extends Exception(messages)
