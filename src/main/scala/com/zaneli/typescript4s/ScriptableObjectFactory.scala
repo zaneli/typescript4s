@@ -88,6 +88,14 @@ object ScriptableObjectFactory extends Logging {
     ts4sIO
   }
 
+  def createUtil(cx: Context, scope: Scriptable): Scriptable = {
+    val ts4sUtil = cx.newObject(scope)
+    putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
+      fileName.asInstanceOf[String].endsWith(defaultLibName)
+    }))
+    ts4sUtil
+  }
+
   private[this] def function(f: () => Any): BaseFunction = {
     function({ args => f() }, 0)
   }

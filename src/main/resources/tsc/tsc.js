@@ -55494,6 +55494,9 @@ var TypeScript;
 
         TypeScriptCompiler.prototype.getSyntacticDiagnostics = function (fileName) {
             fileName = TypeScript.switchToForwardSlashes(fileName);
+            if (ts4sUtil.isDefaultLib(fileName)) {
+                return [];
+            }
             return this.getDocument(fileName).diagnostics();
         };
 
@@ -55511,7 +55514,9 @@ var TypeScript;
             var document = this.getDocument(fileName);
 
             var startTime = (new Date()).getTime();
-            TypeScript.PullTypeResolver.typeCheck(this.compilationSettings(), this.semanticInfoChain, document);
+            if (!ts4sUtil.isDefaultLib(fileName)) {
+                TypeScript.PullTypeResolver.typeCheck(this.compilationSettings(), this.semanticInfoChain, document);
+            }
             var endTime = (new Date()).getTime();
 
             TypeScript.typeCheckTime += endTime - startTime;

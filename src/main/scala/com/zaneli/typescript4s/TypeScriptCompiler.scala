@@ -18,6 +18,7 @@ object TypeScriptCompiler {
     cx.evaluateReader(
       scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream(ScriptableObjectFactory.executingName)), "tsc.js", 1, null)
     scope.put(VarName.ts4sEnv, scope, ScriptableObjectFactory.createEnv(cx, scope))
+    scope.put(VarName.ts4sUtil, scope, ScriptableObjectFactory.createUtil(cx, scope))
     scope
   }
 
@@ -87,6 +88,7 @@ object TypeScriptCompiler {
   private[this] object VarName {
     val ts4sEnv = "ts4sEnv"
     val ts4sIO = "ts4sIO"
+    val ts4sUtil = "ts4sUtil"
   }
 }
 
