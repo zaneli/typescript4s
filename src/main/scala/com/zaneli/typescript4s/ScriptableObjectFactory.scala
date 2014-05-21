@@ -8,8 +8,6 @@ import org.slf4s.Logging
 
 object ScriptableObjectFactory extends Logging {
 
-  private[typescript4s] val executingName = "/tsc/tsc.js"
-  private[this] val defaultLibName = "/tsc/lib.d.ts"
   private[this] val byteOrderMarkNone = 0 // "TypeScript.ByteOrderMark.None"
 
   private[this] lazy val executingFilePath = ScriptableObjectFactory.getClass.getResource(executingName).getPath
@@ -55,7 +53,7 @@ object ScriptableObjectFactory extends Logging {
 
     putProperty(ts4sIO, "readFile", function({ arg =>
       val fileName = arg.toString
-      val contents = if (fileName.endsWith(defaultLibName)) {
+      val contents = if (isDefaultLib(fileName)) {
         defaultLibContents
       } else {
         FileUtils.readFileToString(new File(fileName))
@@ -91,10 +89,12 @@ object ScriptableObjectFactory extends Logging {
   def createUtil(cx: Context, scope: Scriptable): Scriptable = {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
-      fileName.asInstanceOf[String].endsWith(defaultLibName)
+      isDefaultLib(fileName.toString)
     }))
     ts4sUtil
   }
+
+  private[this] def isDefaultLib(fileName: String) = fileName.endsWith(defaultLibName)
 
   private[this] def function(f: () => Any): BaseFunction = {
     function({ args => f() }, 0)

@@ -16,7 +16,7 @@ object TypeScriptCompiler {
     global.init(cx)
     val scope = cx.initStandardObjects(global)
     cx.evaluateReader(
-      scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream(ScriptableObjectFactory.executingName)), "tsc.js", 1, null)
+      scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream(executingName)), "tsc.js", 1, null)
     scope.put(VarName.ts4sEnv, scope, ScriptableObjectFactory.createEnv(cx, scope))
     scope.put(VarName.ts4sUtil, scope, ScriptableObjectFactory.createUtil(cx, scope))
     scope
