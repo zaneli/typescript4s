@@ -2,7 +2,7 @@ package com.zaneli.typescript4s
 
 import java.io.File
 import org.apache.commons.io.{ FileUtils, IOUtils }
-import org.mozilla.javascript.{ BaseFunction, Context, Scriptable, Undefined }
+import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
 import org.slf4s.Logging
 
@@ -90,6 +90,10 @@ object ScriptableObjectFactory extends Logging {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
       isDefaultLib(fileName.toString)
+    }))
+
+    putProperty(ts4sUtil, "isDeclarationEnabled", function({ compilationSettings =>
+      compilationSettings.asInstanceOf[NativeObject].get("_generateDeclarationFiles").asInstanceOf[Boolean]
     }))
     ts4sUtil
   }
