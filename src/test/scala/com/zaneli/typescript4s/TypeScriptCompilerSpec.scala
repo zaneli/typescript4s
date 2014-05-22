@@ -10,13 +10,15 @@ import org.specs2.runner.JUnitRunner
 class TypeScriptCompilerSpec extends Specification {
 
   "TypeScriptCompiler#compile" should {
+    val compiler = new TypeScriptCompiler()
+
     "compile standalone ts file" in new context {
       val src = getPath("/ts/standalone.ts")
       val expectedDest = getDestJsPath(src)
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDest = TypeScriptCompiler.compile(src)
+      val actualDest = compiler.compile(src)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
       getContents(actualDest) must_== getContents("/js/standalone.js")
     }
@@ -27,7 +29,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDest = TypeScriptCompiler.compile(src)
+      val actualDest = compiler.compile(src)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
       getContents(actualDest) must_== getContents("/js/refer-jquery.js")
     }
@@ -38,7 +40,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDest = TypeScriptCompiler.compile(src)
+      val actualDest = compiler.compile(src)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
       getContents(actualDest) must_== getContents("/js/refer-jquery.tile.js")
     }
@@ -50,7 +52,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDest = TypeScriptCompiler.compile(src, removeComments = true)
+        val actualDest = compiler.compile(src, removeComments = true)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
         getContents(actualDest) must_== getContents("/js/remove-comments.js")
       }
@@ -61,7 +63,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDest = TypeScriptCompiler.compile(src, out = expectedDest)
+        val actualDest = compiler.compile(src, out = expectedDest)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
         getContents(actualDest) must_== getContents("/js/standalone.js")
       }
@@ -72,7 +74,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDest = TypeScriptCompiler.compile(src, outDir = expectedDest.getParentFile)
+        val actualDest = compiler.compile(src, outDir = expectedDest.getParentFile)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
         getContents(actualDest) must_== getContents("/js/standalone.js")
       }
@@ -85,7 +87,7 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDestJs.exists must beFalse
         expectedDestDts.exists must beFalse
 
-        val actualDest = TypeScriptCompiler.compile(src, declaration = true)
+        val actualDest = compiler.compile(src, declaration = true)
         actualDest.getAbsolutePath must_== expectedDestJs.getAbsolutePath
         getContents(actualDest) must_== getContents("/js/with-declaration.js")
         getContents(expectedDestDts) must_== getContents("/ts/typings/with-declaration.d.ts")

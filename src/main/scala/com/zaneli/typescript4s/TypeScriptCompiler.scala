@@ -4,7 +4,7 @@ import java.io.{ File, InputStreamReader }
 import org.mozilla.javascript.{ Context, ContextFactory, Scriptable }
 import org.mozilla.javascript.tools.shell.Global
 
-object TypeScriptCompiler {
+class TypeScriptCompiler {
 
   private[this] lazy val contextFactory = new ContextFactory()
   private[this] lazy val global = new Global()
@@ -16,7 +16,7 @@ object TypeScriptCompiler {
     global.init(cx)
     val scope = cx.initStandardObjects(global)
     cx.evaluateReader(
-      scope, new InputStreamReader(TypeScriptCompiler.getClass.getResourceAsStream(executingName)), "tsc.js", 1, null)
+      scope, new InputStreamReader(this.getClass.getResourceAsStream(executingName)), "tsc.js", 1, null)
     scope.put(VarName.ts4sEnv, scope, ScriptableObjectFactory.createEnv(cx, scope))
     scope.put(VarName.ts4sUtil, scope, ScriptableObjectFactory.createUtil(cx, scope))
     scope
@@ -43,14 +43,6 @@ object TypeScriptCompiler {
       throw new TypeScriptCompilerException(s"${dest.getAbsolutePath} file not found.")
     }
     dest
-  }
-
-  def help(): Unit = {
-    execute("--help")
-  }
-
-  def version(): Unit = {
-    execute("--version")
   }
 
   def execute(args: String*): Unit = synchronized {
@@ -89,6 +81,16 @@ object TypeScriptCompiler {
     val ts4sEnv = "ts4sEnv"
     val ts4sIO = "ts4sIO"
     val ts4sUtil = "ts4sUtil"
+  }
+}
+
+object TypeScriptCompiler {
+  def help(): Unit = {
+    new TypeScriptCompiler().execute("--help")
+  }
+
+  def version(): Unit = {
+    new TypeScriptCompiler().execute("--version")
   }
 }
 

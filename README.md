@@ -8,26 +8,26 @@ Scala library to compile [TypeScript](http://www.typescriptlang.org/)
 * compile
 ```
 import com.zaneli.typescript4s.TypeScriptCompiler
-import java.io.File
 
-val dest = TypeScriptCompiler.compile(new File("example.ts"))
-val destExcludeComments = TypeScriptCompiler.compile(new File("example.ts"), removeComments = true)
-TypeScriptCompiler.execute("example.ts", "--removeComments")
+val compiler = new TypeScriptCompiler()
+val dest = compiler.compile(new java.io.File("example.ts"))
+val destExcludeComments = compiler.compile(new java.io.File("example.ts"), removeComments = true)
+compiler.execute("example.ts", "--removeComments")
 ```
 compile method return compiled JavaScript file path.
 
 * show help
 ```
 TypeScriptCompiler.help()
-TypeScriptCompiler.execute("-h")
-TypeScriptCompiler.execute("--help")
+compiler.execute("-h")
+compiler.execute("--help")
 ```
 
 * show version
 ```
 TypeScriptCompiler.version()
-TypeScriptCompiler.execute("-v")
-TypeScriptCompiler.execute("--version")
+compiler.execute("-v")
+compiler.execute("--version")
 ```
 
 ## Credit

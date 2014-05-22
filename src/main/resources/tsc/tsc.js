@@ -27590,7 +27590,13 @@ var TypeScript;
             if (!result) {
                 var start = new Date().getTime();
 
-                result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
+                var cachedResult = ts4sUtil.getParseResultCache(this.fileName);
+                if (cachedResult) {
+                    result = cachedResult;
+                } else {
+                    result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
+                    ts4sUtil.putParseResultCache(this.fileName, result);
+                }
 
                 TypeScript.syntaxTreeParseTime += new Date().getTime() - start;
 

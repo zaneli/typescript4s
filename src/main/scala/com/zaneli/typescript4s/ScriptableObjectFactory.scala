@@ -95,6 +95,15 @@ object ScriptableObjectFactory extends Logging {
     putProperty(ts4sUtil, "isDeclarationEnabled", function({ compilationSettings =>
       compilationSettings.asInstanceOf[NativeObject].get("_generateDeclarationFiles").asInstanceOf[Boolean]
     }))
+
+    val cache = collection.mutable.Map[String, Object]()
+    putProperty(ts4sUtil, "putParseResultCache", function({ (fileName, parseResult) =>
+      cache.synchronized(cache.put(fileName.toString, parseResult))
+      Unit
+    }))
+    putProperty(ts4sUtil, "getParseResultCache", function({ fileName =>
+      cache.synchronized(cache.get(fileName.toString).getOrElse(Undefined.instance))
+    }))
     ts4sUtil
   }
 
@@ -106,6 +115,10 @@ object ScriptableObjectFactory extends Logging {
 
   private[this] def function(f: (Object) => Any): BaseFunction = {
     function({ args => f(args(0)) }, 1)
+  }
+
+  private[this] def function(f: (Object, Object) => Any): BaseFunction = {
+    function({ args => f(args(0), args(1)) }, 2)
   }
 
   private[this] def function(f: (Object, Object, Object) => Any): BaseFunction = {
