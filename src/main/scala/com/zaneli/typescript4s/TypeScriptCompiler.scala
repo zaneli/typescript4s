@@ -33,16 +33,34 @@ class TypeScriptCompiler {
     removeComments: Boolean = false,
     noImplicitAny: Boolean = false,
     declaration: Boolean = false,
-    sourcemap: Boolean = false): File = {
+    sourcemap: Boolean = false): Seq[File] = {
     compile(src, CompileOptions(out, outDir, mapRoot, sourceRoot, module, target, removeComments, noImplicitAny, declaration, sourcemap))
   }
-  def compile(src: File, options: CompileOptions): File = {
+  def compile(src: File, options: CompileOptions): Seq[File] = {
     execute(options.mkArgs(src): _*)
-    val dest = getDestFilePath(src, options)
-    if (!dest.isFile) {
-      throw new TypeScriptCompilerException(s"${dest.getAbsolutePath} file not found.")
+    val (destDir, fileName) = getDestInfo(src, options)
+    val destFile = getDestFilePath(destDir, fileName, "js")
+    if (!destFile.isFile) {
+      throw new TypeScriptCompilerException(s"${destFile.getAbsolutePath} file not found.")
     }
-    dest
+
+    val files = new scala.collection.mutable.ListBuffer[File]()
+    files += destFile
+    if (options.declaration) {
+      val declarationFile = getDestFilePath(destDir, fileName, "d.ts")
+      if (!declarationFile.isFile) {
+        throw new TypeScriptCompilerException(s"${declarationFile.getAbsolutePath} file not found.")
+      }
+      files += declarationFile
+    }
+    if (options.sourcemap) {
+      val sourcemapFile = getDestFilePath(destDir, fileName, "js.map")
+      if (!sourcemapFile.isFile) {
+        throw new TypeScriptCompilerException(s"${sourcemapFile.getAbsolutePath} file not found.")
+      }
+      files += sourcemapFile
+    }
+    files.toSeq
   }
 
   def execute(args: String*): Unit = synchronized {
@@ -52,14 +70,18 @@ class TypeScriptCompiler {
     }
   }
 
-  private[this] def getDestFilePath(src: File, options: CompileOptions): File = (options.outOpt, options.outDirOpt) match {
-    case (Some(file), _) => file
-    case (_, Some(dir)) => getDestFilePath(dir, src)
-    case _ => getDestFilePath(src.getParentFile, src)
+  private[this] def getDestInfo(src: File, options: CompileOptions): (File, String) = (options.outOpt, options.outDirOpt) match {
+    case (Some(file), _) => (file.getParentFile, getFileName(file))
+    case (_, Some(dir)) => (dir, getFileName(src))
+    case _ => (src.getParentFile, getFileName(src))
   }
 
-  private[this] def getDestFilePath(dir: File, src: File): File = {
-    new File(dir, src.getName.split("""\.""").init.mkString(".") + ".js")
+  private[this] def getFileName(file: File): String = {
+    file.getName.split("""\.""").init.mkString(".")
+  }
+
+  private[this] def getDestFilePath(dir: File, srcName: String, ext: String): File = {
+    new File(dir, s"${srcName}.${ext}")
   }
 
   private[this] def withContext[A](f: Context => A): A = try {
