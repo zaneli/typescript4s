@@ -1,6 +1,7 @@
 package com.zaneli.typescript4s
 
 import java.io.{ File, InputStreamReader }
+import org.apache.commons.io.IOUtils
 import org.mozilla.javascript.{ Context, ContextFactory, Scriptable }
 import org.mozilla.javascript.tools.shell.Global
 
@@ -15,8 +16,7 @@ class TypeScriptCompiler {
     cx.setLanguageVersion(Context.VERSION_1_7)
     global.init(cx)
     val scope = cx.initStandardObjects(global)
-    cx.evaluateReader(
-      scope, new InputStreamReader(this.getClass.getResourceAsStream(executingName)), "tsc.js", 1, null)
+    cx.evaluateString(scope, TypeScriptCompiler.tscJs, "tsc.js", 1, null)
     scope.put(VarName.ts4sEnv, scope, ScriptableObjectFactory.createEnv(cx, scope))
     scope.put(VarName.ts4sUtil, scope, ScriptableObjectFactory.createUtil(cx, scope))
     scope
@@ -114,6 +114,8 @@ object TypeScriptCompiler {
   def version(): Unit = {
     new TypeScriptCompiler().execute("--version")
   }
+
+  private lazy val tscJs = IOUtils.toString(classOf[TypeScriptCompiler].getResourceAsStream(executingName))
 }
 
 class TypeScriptCompilerException(messages: String) extends Exception(messages)
