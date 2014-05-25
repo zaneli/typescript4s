@@ -2,7 +2,7 @@ package com.zaneli.typescript4s
 
 import java.io.File
 import org.apache.commons.io.{ FileUtils, IOUtils }
-import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined }
+import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined, WrappedException }
 import org.mozilla.javascript.ScriptableObject.putProperty
 import org.slf4s.Logging
 
@@ -73,14 +73,16 @@ object ScriptableObjectFactory extends Logging {
     }))
 
     val stderr = cx.newObject(scope)
+    val errors = collection.mutable.ListBuffer[String]()
     putProperty(stderr, "Write", function({ msg =>
+      errors += msg.toString
       log.error(msg.toString)
     }))
     putProperty(ts4sIO, "stderr", stderr)
 
     putProperty(ts4sIO, "quit", function({ status =>
       if (status.asInstanceOf[Double] == 1.0) {
-        throw new TypeScriptCompilerException("tsc quit with error")
+        throw new WrappedException(new TypeScriptCompilerException(errors.mkString(", ")))
       }
     }))
     ts4sIO

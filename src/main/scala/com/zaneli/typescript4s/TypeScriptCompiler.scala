@@ -2,7 +2,7 @@ package com.zaneli.typescript4s
 
 import java.io.{ File, InputStreamReader }
 import org.apache.commons.io.IOUtils
-import org.mozilla.javascript.{ Context, ContextFactory, Scriptable }
+import org.mozilla.javascript.{ Context, ContextFactory, Scriptable, WrappedException }
 import org.mozilla.javascript.tools.shell.Global
 
 class TypeScriptCompiler {
@@ -87,6 +87,8 @@ class TypeScriptCompiler {
   private[this] def withContext[A](f: Context => A): A = try {
     val cx = contextFactory.enterContext()
     f(cx)
+  } catch {
+    case e: WrappedException => throw e.getWrappedException()
   } finally {
     Context.exit()
   }
