@@ -94,8 +94,8 @@ object ScriptableObjectFactory extends Logging {
       isDefaultLib(fileName.toString)
     }))
 
-    putProperty(ts4sUtil, "isDeclarationEnabled", function({ compilationSettings =>
-      compilationSettings.asInstanceOf[NativeObject].get("_generateDeclarationFiles").asInstanceOf[Boolean]
+    putProperty(ts4sUtil, "isTypeCheckEnabled", function({ fileName =>
+      !fileName.toString.endsWith(".d.ts")
     }))
 
     val cache = collection.mutable.Map[String, Object]()

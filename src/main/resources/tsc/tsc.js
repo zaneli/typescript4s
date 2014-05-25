@@ -55514,7 +55514,7 @@ var TypeScript;
             var document = this.getDocument(fileName);
 
             var startTime = (new Date()).getTime();
-            if (ts4sUtil.isDeclarationEnabled(this.compilationSettings()) && !ts4sUtil.isDefaultLib(fileName)) {
+            if (ts4sUtil.isTypeCheckEnabled(fileName)) {
                 TypeScript.PullTypeResolver.typeCheck(this.compilationSettings(), this.semanticInfoChain, document);
             }
             var endTime = (new Date()).getTime();

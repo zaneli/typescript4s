@@ -51,6 +51,15 @@ class TypeScriptCompilerSpec extends Specification {
       getContents(actualDest) must_== getContents("/js/refer-jquery.tile.js")
     }
 
+    "failed invalid type exists" in new context {
+      val src = getPath("/ts/invald.ts")
+      val expectedDest = getDestJsPath(src)
+      destFiles += expectedDest
+      expectedDest.exists must beFalse
+
+      compiler.compile(src) must throwA[TypeScriptCompilerException]
+    }
+
     "option" in {
       "removeComments" in new context {
         val src = getPath("/ts/remove-comments.ts")
