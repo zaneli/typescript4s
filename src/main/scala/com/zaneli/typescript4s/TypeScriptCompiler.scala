@@ -1,7 +1,6 @@
 package com.zaneli.typescript4s
 
-import java.io.{ File, InputStreamReader }
-import org.apache.commons.io.{ FileUtils, IOUtils }
+import java.io.File
 import org.mozilla.javascript.{ Context, ContextFactory, Scriptable, WrappedException }
 import org.mozilla.javascript.tools.shell.Global
 import org.mozilla.javascript.JavaScriptException
@@ -17,11 +16,11 @@ class TypeScriptCompiler {
     val global = new Global()
     global.init(cx)
     val scope = cx.initStandardObjects(global)
-    cx.evaluateString(scope, TypeScriptCompiler.tsServices, "typescriptServices.js", 1, null)
+    cx.evaluateString(scope, ScriptResources.tsServices, "typescriptServices.js", 1, null)
     ScriptableObjectHelper.addUtil(cx, scope)
     ScriptableObjectHelper.addHost(cx, scope)
     ScriptableObjectHelper.addEnv(cx, scope)
-    scope.put("defaultLibSnapshot", scope, ScriptableObjectHelper.getScriptSnapshot(cx, scope, TypeScriptCompiler.defaultLib))
+    ScriptableObjectHelper.addDefaultLibInfo(cx, scope)
     scope
   }
 
@@ -72,7 +71,7 @@ class TypeScriptCompiler {
       val executeScope = cx.newObject(globalScope)
       ScriptableObjectHelper.addSettings(cx, executeScope, options)
       ScriptableObjectHelper.addInputFiles(cx, executeScope, src)
-      cx.evaluateString(executeScope, TypeScriptCompiler.ts4s, "ts4s.js", 1, null)
+      cx.evaluateString(executeScope, ScriptResources.ts4s, "ts4s.js", 1, null)
     }
   }
 
@@ -99,12 +98,6 @@ class TypeScriptCompiler {
   } finally {
     Context.exit()
   }
-}
-
-object TypeScriptCompiler {
-  private lazy val tsServices = IOUtils.toString(classOf[TypeScriptCompiler].getResourceAsStream("/tsc/typescriptServices.js"))
-  private lazy val ts4s = IOUtils.toString(classOf[TypeScriptCompiler].getResourceAsStream("/tsc/ts4s.js"))
-  private lazy val defaultLib = IOUtils.toString(classOf[TypeScriptCompiler].getResourceAsStream("/tsc/lib.d.ts"))
 }
 
 class TypeScriptCompilerException(messages: String, cause: Throwable = null) extends Exception(messages, cause)

@@ -3,7 +3,7 @@
   var logger = new TypeScript.NullLogger();
   var compiler = new TypeScript.TypeScriptCompiler(logger, ts4sSettings);
 
-  compiler.addFile("lib.d.ts", defaultLibSnapshot, TypeScript.ByteOrderMark.None, 0, false, []);
+  compiler.addFile(ts4sDefaultLibName, ts4sDefaultLibSnapshot, TypeScript.ByteOrderMark.None, 0, false, []);
 
   var result = TypeScript.ReferenceResolver.resolve(ts4sInputFiles, ts4sHost);
   result.diagnostics.forEach(function (d) {

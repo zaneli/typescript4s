@@ -7,6 +7,8 @@ import org.mozilla.javascript.ScriptableObject.putProperty
 
 private[typescript4s] object ScriptableObjectHelper {
 
+  private[this] val defaultLibName = "ts4s.lib.d.ts"
+
   private[typescript4s] def addEnv(cx: Context, scope: Scriptable): Unit = {
     val ts4sEnv = cx.newObject(scope)
     putProperty(ts4sEnv, "newLine", System.getProperty("line.separator"))
@@ -40,11 +42,7 @@ private[typescript4s] object ScriptableObjectHelper {
   private[typescript4s] def addUtil(cx: Context, scope: Scriptable): Unit = {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
-      fileName.toString == "lib.d.ts"
-    }))
-    putProperty(ts4sUtil, "isTypeCheckEnabled", function({ fileName =>
-      // It is desirable to perform all other than 'lib.d.ts', but it's just for effective compile speed.
-      !fileName.toString.endsWith(".d.ts")
+      fileName.toString == defaultLibName
     }))
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
@@ -75,7 +73,12 @@ private[typescript4s] object ScriptableObjectHelper {
     put(VarName.ts4sInputFiles, inputFiles, scope)
   }
 
-  private[typescript4s] def getScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
+  private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable) {
+    put(VarName.ts4sDefaultLibName, defaultLibName, scope)
+    put(VarName.ts4sDefaultLibSnapshot, getScriptSnapshot(cx, scope, ScriptResources.defaultLib), scope)
+  }
+
+  private[this] def getScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
     val tmpScope = cx.newObject(scope);
     tmpScope.put(s"content", tmpScope, content)
     cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js", 1, null)
@@ -119,5 +122,7 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sHost = "ts4sHost"
     val ts4sSettings = "ts4sSettings"
     val ts4sInputFiles = "ts4sInputFiles"
+    val ts4sDefaultLibName = "ts4sDefaultLibName"
+    val ts4sDefaultLibSnapshot = "ts4sDefaultLibSnapshot"
   }
 }
