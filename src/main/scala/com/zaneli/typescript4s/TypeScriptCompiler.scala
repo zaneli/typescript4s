@@ -1,24 +1,26 @@
 package com.zaneli.typescript4s
 
-import java.io.{ File, InputStreamReader }
-import org.apache.commons.io.IOUtils
+import java.io.File
 import org.mozilla.javascript.{ Context, ContextFactory, Scriptable, WrappedException }
 import org.mozilla.javascript.tools.shell.Global
+import org.mozilla.javascript.JavaScriptException
 
 class TypeScriptCompiler {
 
   private[this] lazy val contextFactory = new ContextFactory()
-  private[this] lazy val global = new Global()
-  private[this] lazy val scope = init()
+  private[this] lazy val globalScope = init()
 
-  def init(): Scriptable = withContext { cx =>
+  private[this] def init(): Scriptable = withContext { cx =>
     cx.setOptimizationLevel(-1)
     cx.setLanguageVersion(Context.VERSION_1_7)
+    val global = new Global()
     global.init(cx)
     val scope = cx.initStandardObjects(global)
-    cx.evaluateString(scope, TypeScriptCompiler.tscJs, "tsc.js", 1, null)
-    scope.put(VarName.ts4sEnv, scope, ScriptableObjectFactory.createEnv(cx, scope))
-    scope.put(VarName.ts4sUtil, scope, ScriptableObjectFactory.createUtil(cx, scope))
+    cx.evaluateString(scope, ScriptResources.tsServices, "typescriptServices.js", 1, null)
+    ScriptableObjectHelper.addUtil(cx, scope)
+    ScriptableObjectHelper.addHost(cx, scope)
+    ScriptableObjectHelper.addEnv(cx, scope)
+    ScriptableObjectHelper.addDefaultLibInfo(cx, scope)
     scope
   }
 
@@ -28,8 +30,8 @@ class TypeScriptCompiler {
     outDir: File = null,
     mapRoot: File = null,
     sourceRoot: File = null,
-    module: ModuleKind = null,
-    target: ECMAVersion = null,
+    module: ModuleKind = ModuleKind.Unspecified,
+    target: ECMAVersion = ECMAVersion.ES3,
     removeComments: Boolean = false,
     noImplicitAny: Boolean = false,
     declaration: Boolean = false,
@@ -37,7 +39,8 @@ class TypeScriptCompiler {
     compile(src, CompileOptions(out, outDir, mapRoot, sourceRoot, module, target, removeComments, noImplicitAny, declaration, sourcemap))
   }
   def compile(src: File, options: CompileOptions): Seq[File] = {
-    execute(options.mkArgs(src): _*)
+    execute(src, options)
+
     val (destDir, fileName) = getDestInfo(src, options)
     val destFile = getDestFilePath(destDir, fileName, "js")
     if (!destFile.isFile) {
@@ -63,10 +66,12 @@ class TypeScriptCompiler {
     files.toSeq
   }
 
-  def execute(args: String*): Unit = synchronized {
+  private[this] def execute(src: File, options: CompileOptions): Unit = synchronized {
     withContext { cx =>
-      scope.put(VarName.ts4sIO, scope, ScriptableObjectFactory.createIO(cx, scope, args))
-      cx.evaluateString(scope, jsCodes, "compile.js", 1, null)
+      val executeScope = cx.newObject(globalScope)
+      ScriptableObjectHelper.addSettings(cx, executeScope, options)
+      ScriptableObjectHelper.addInputFiles(cx, executeScope, src)
+      cx.evaluateString(executeScope, ScriptResources.ts4s, "ts4s.js", 1, null)
     }
   }
 
@@ -89,35 +94,10 @@ class TypeScriptCompiler {
     f(cx)
   } catch {
     case e: WrappedException => throw e.getWrappedException()
+    case e: JavaScriptException => throw new TypeScriptCompilerException(e.getMessage, cause = e)
   } finally {
     Context.exit()
   }
-
-  private[this] val jsCodes: String =
-    s"""
-    TypeScript.Environment = ${VarName.ts4sEnv};
-    TypeScript.IO = ${VarName.ts4sIO};
-    var batch = new TypeScript.BatchCompiler(TypeScript.IO);
-    batch.batchCompile();
-    """
-
-  private[this] object VarName {
-    val ts4sEnv = "ts4sEnv"
-    val ts4sIO = "ts4sIO"
-    val ts4sUtil = "ts4sUtil"
-  }
 }
 
-object TypeScriptCompiler {
-  def help(): Unit = {
-    new TypeScriptCompiler().execute("--help")
-  }
-
-  def version(): Unit = {
-    new TypeScriptCompiler().execute("--version")
-  }
-
-  private lazy val tscJs = IOUtils.toString(classOf[TypeScriptCompiler].getResourceAsStream(executingName))
-}
-
-class TypeScriptCompilerException(messages: String) extends Exception(messages)
+class TypeScriptCompilerException(messages: String, cause: Throwable = null) extends Exception(messages, cause)
