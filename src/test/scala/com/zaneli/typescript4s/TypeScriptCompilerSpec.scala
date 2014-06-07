@@ -10,15 +10,13 @@ import org.specs2.runner.JUnitRunner
 class TypeScriptCompilerSpec extends Specification {
 
   "TypeScriptCompiler#compile" should {
-    val compiler = new TypeScriptCompiler()
-
     "compile standalone ts file" in new context {
       val src = getPath("/ts/standalone.ts")
       val expectedDest = getDestJsPath(src)
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDests = compiler.compile(src)
+      val actualDests = TypeScriptCompiler.compile(src)
       actualDests must have size 1
       val actualDest = actualDests(0)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -31,7 +29,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDests = compiler.compile(src)
+      val actualDests = TypeScriptCompiler.compile(src)
       actualDests must have size 1
       val actualDest = actualDests(0)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -44,7 +42,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDests = compiler.compile(src)
+      val actualDests = TypeScriptCompiler.compile(src)
       actualDests must have size 1
       val actualDest = actualDests(0)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -57,7 +55,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      compiler.compile(src) must throwA[TypeScriptCompilerException]
+      TypeScriptCompiler.compile(src) must throwA[TypeScriptCompilerException]
     }
 
     "option" in {
@@ -67,7 +65,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDests = compiler.compile(src, removeComments = true)
+        val actualDests = TypeScriptCompiler.compile(src, removeComments = true)
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -80,7 +78,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDests = compiler.compile(src, out = expectedDest)
+        val actualDests = TypeScriptCompiler.compile(src, out = expectedDest)
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -93,7 +91,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDests = compiler.compile(src, outDir = expectedDest.getParentFile)
+        val actualDests = TypeScriptCompiler.compile(src, outDir = expectedDest.getParentFile)
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -108,7 +106,7 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDestJs.exists must beFalse
         expectedDestDts.exists must beFalse
 
-        val actualDests = compiler.compile(src, declaration = true)
+        val actualDests = TypeScriptCompiler.compile(src, declaration = true)
         actualDests must have size 2
         val actualDestJs = actualDests(0)
         actualDestJs.getAbsolutePath must_== expectedDestJs.getAbsolutePath
@@ -126,7 +124,7 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDestJs.exists must beFalse
         expectedDestMap.exists must beFalse
 
-        val actualDests = compiler.compile(src, sourcemap = true)
+        val actualDests = TypeScriptCompiler.compile(src, sourcemap = true)
         actualDests must have size 2
         val actualDestJs = actualDests(0)
         actualDestJs.getAbsolutePath must_== expectedDestJs.getAbsolutePath

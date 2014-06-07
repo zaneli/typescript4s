@@ -7,8 +7,6 @@ import org.mozilla.javascript.ScriptableObject.putProperty
 
 private[typescript4s] object ScriptableObjectHelper {
 
-  private[this] val defaultLibName = "ts4s.lib.d.ts"
-
   private[typescript4s] def addEnv(cx: Context, scope: Scriptable): Unit = {
     val ts4sEnv = cx.newObject(scope)
     putProperty(ts4sEnv, "newLine", System.getProperty("line.separator"))
@@ -39,10 +37,25 @@ private[typescript4s] object ScriptableObjectHelper {
     put(VarName.ts4sHost, ts4sHost, scope)
   }
 
-  private[typescript4s] def addUtil(cx: Context, scope: Scriptable): Unit = {
+  private[typescript4s] def addUtil(
+    cx: Context, scope: Scriptable, syntaxTree: Object, sourceUnit: Object): Unit = {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
-      fileName.toString == defaultLibName
+      fileName.toString == ScriptResources.defaultLibName
+    }))
+    putProperty(ts4sUtil, "getDefaultLibSyntaxTree", function({ fileName =>
+      if (fileName.toString == ScriptResources.defaultLibName) {
+        syntaxTree
+      } else {
+        Undefined.instance
+      }
+    }))
+    putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
+      if (fileName.toString == ScriptResources.defaultLibName) {
+        sourceUnit
+      } else {
+        Undefined.instance
+      }
     }))
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
@@ -61,7 +74,7 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(mutableSettings, "mapSourceFiles", options.sourcemap)
     putProperty(mutableSettings, "noImplicitAny", options.noImplicitAny)
 
-    val tmpScope = cx.newObject(scope);
+    val tmpScope = cx.newObject(scope)
     tmpScope.put("mutableSettings", tmpScope, mutableSettings)
     val immutableSettings = cx.evaluateString(
       tmpScope, "TypeScript.ImmutableCompilationSettings.fromCompilationSettings(mutableSettings)", "", 1, null)
@@ -74,12 +87,12 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable) {
-    put(VarName.ts4sDefaultLibName, defaultLibName, scope)
+    put(VarName.ts4sDefaultLibName, ScriptResources.defaultLibName, scope)
     put(VarName.ts4sDefaultLibSnapshot, getScriptSnapshot(cx, scope, ScriptResources.defaultLib), scope)
   }
 
   private[this] def getScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
-    val tmpScope = cx.newObject(scope);
+    val tmpScope = cx.newObject(scope)
     tmpScope.put(s"content", tmpScope, content)
     cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js", 1, null)
   }

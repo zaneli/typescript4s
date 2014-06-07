@@ -1,11 +1,10 @@
 package com.zaneli.typescript4s
 
 import java.io.File
-import org.mozilla.javascript.{ Context, ContextFactory, Scriptable, WrappedException }
+import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, Scriptable, WrappedException }
 import org.mozilla.javascript.tools.shell.Global
-import org.mozilla.javascript.JavaScriptException
 
-class TypeScriptCompiler {
+object TypeScriptCompiler {
 
   private[this] lazy val contextFactory = new ContextFactory()
   private[this] lazy val globalScope = init()
@@ -17,10 +16,13 @@ class TypeScriptCompiler {
     global.init(cx)
     val scope = cx.initStandardObjects(global)
     cx.evaluateString(scope, ScriptResources.tsServices, "typescriptServices.js", 1, null)
-    ScriptableObjectHelper.addUtil(cx, scope)
     ScriptableObjectHelper.addHost(cx, scope)
     ScriptableObjectHelper.addEnv(cx, scope)
     ScriptableObjectHelper.addDefaultLibInfo(cx, scope)
+
+    val syntaxTree = evalSyntaxTree(scope)
+    val sourceUnit = evalSourceUnit(scope, syntaxTree)
+    ScriptableObjectHelper.addUtil(cx, scope, syntaxTree, sourceUnit)
     scope
   }
 
@@ -87,6 +89,42 @@ class TypeScriptCompiler {
 
   private[this] def getDestFilePath(dir: File, srcName: String, ext: String): File = {
     new File(dir, s"${srcName}.${ext}")
+  }
+
+  private[this] def evalSyntaxTree(scope: Scriptable): Object = {
+    withContext { cx =>
+      val tmpScope = cx.newObject(scope)
+      cx.evaluateString(
+        tmpScope,
+        """
+        TypeScript.Parser.parse(
+          ts4sDefaultLibName,
+          TypeScript.SimpleText.fromScriptSnapshot(ts4sDefaultLibSnapshot),
+          TypeScript.isDTSFile(ts4sDefaultLibName),
+          TypeScript.getParseOptions(TypeScript.ImmutableCompilationSettings.defaultSettings()));
+        """,
+        "syntaxTree.js",
+        1,
+        null)
+    }
+  }
+
+  private[this] def evalSourceUnit(scope: Scriptable, syntaxTree: Object): Object = {
+    withContext { cx =>
+      val tmpScope = cx.newObject(scope)
+      scope.put("ts4sSyntaxTree", tmpScope, syntaxTree)
+      cx.evaluateString(
+        tmpScope,
+        """
+        ts4sSyntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
+          ts4sDefaultLibName,
+          ts4sSyntaxTree.lineMap(),
+          TypeScript.ImmutableCompilationSettings.defaultSettings()));
+        """,
+        "sourceUnit.js",
+        1,
+        null)
+    }
   }
 
   private[this] def withContext[A](f: Context => A): A = try {
