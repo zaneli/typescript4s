@@ -20,8 +20,8 @@ object TypeScriptCompiler {
     ScriptableObjectHelper.addEnv(cx, scope)
     ScriptableObjectHelper.addDefaultLibInfo(cx, scope)
 
-    val syntaxTree = evalSyntaxTree(scope)
-    val sourceUnit = evalSourceUnit(scope, syntaxTree)
+    val syntaxTree = evalSyntaxTree(cx, scope)
+    val sourceUnit = evalSourceUnit(cx, scope, syntaxTree)
     ScriptableObjectHelper.addUtil(cx, scope, syntaxTree, sourceUnit)
     scope
   }
@@ -91,40 +91,45 @@ object TypeScriptCompiler {
     new File(dir, s"${srcName}.${ext}")
   }
 
-  private[this] def evalSyntaxTree(scope: Scriptable): Object = {
-    withContext { cx =>
-      val tmpScope = cx.newObject(scope)
-      cx.evaluateString(
-        tmpScope,
-        """
-        TypeScript.Parser.parse(
-          ts4sDefaultLibName,
-          TypeScript.SimpleText.fromScriptSnapshot(ts4sDefaultLibSnapshot),
-          TypeScript.isDTSFile(ts4sDefaultLibName),
-          TypeScript.getParseOptions(TypeScript.ImmutableCompilationSettings.defaultSettings()));
-        """,
-        "syntaxTree.js",
-        1,
-        null)
-    }
+  private[this] def evalSyntaxTree(cx: Context, scope: Scriptable): Map[String, Object] = {
+    (ScriptResources.defaultLibNames.zipWithIndex map {
+      case (name, index) =>
+        val tmpScope = cx.newObject(scope)
+        val syntaxTree = cx.evaluateString(
+          tmpScope,
+          s"""
+          TypeScript.Parser.parse(
+            ts4sDefaultLibs[${index}].name,
+            TypeScript.SimpleText.fromScriptSnapshot(ts4sDefaultLibs[${index}].snapshot),
+            TypeScript.isDTSFile(ts4sDefaultLibs[${index}].name),
+            TypeScript.getParseOptions(TypeScript.ImmutableCompilationSettings.defaultSettings()));
+          """,
+          "syntaxTree.js",
+          1,
+          null)
+        (name -> syntaxTree)
+    }).toMap
   }
 
-  private[this] def evalSourceUnit(scope: Scriptable, syntaxTree: Object): Object = {
-    withContext { cx =>
-      val tmpScope = cx.newObject(scope)
-      scope.put("ts4sSyntaxTree", tmpScope, syntaxTree)
-      cx.evaluateString(
-        tmpScope,
-        """
-        ts4sSyntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
-          ts4sDefaultLibName,
-          ts4sSyntaxTree.lineMap(),
-          TypeScript.ImmutableCompilationSettings.defaultSettings()));
-        """,
-        "sourceUnit.js",
-        1,
-        null)
-    }
+  private[this] def evalSourceUnit(
+    cx: Context, scope: Scriptable, syntaxTree: Map[String, Object]): Map[String, Object] = {
+    (ScriptResources.defaultLibNames map {
+      case name =>
+        val tmpScope = cx.newObject(scope)
+        tmpScope.put("ts4sSyntaxTree", tmpScope, syntaxTree(name))
+        val sourceUnit = cx.evaluateString(
+          tmpScope,
+          s"""
+          ts4sSyntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
+            "${name}",
+            ts4sSyntaxTree.lineMap(),
+            TypeScript.ImmutableCompilationSettings.defaultSettings()));
+          """,
+          "sourceUnit.js",
+          1,
+          null)
+        (name -> sourceUnit)
+    }).toMap
   }
 
   private[this] def withContext[A](f: Context => A): A = try {

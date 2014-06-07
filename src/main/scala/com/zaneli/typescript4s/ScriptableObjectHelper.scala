@@ -38,24 +38,16 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def addUtil(
-    cx: Context, scope: Scriptable, syntaxTree: Object, sourceUnit: Object): Unit = {
+    cx: Context, scope: Scriptable, syntaxTree: Map[String, Object], sourceUnit: Map[String, Object]): Unit = {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
-      fileName.toString == ScriptResources.defaultLibName
+      ScriptResources.defaultLibNames.contains(fileName)
     }))
     putProperty(ts4sUtil, "getDefaultLibSyntaxTree", function({ fileName =>
-      if (fileName.toString == ScriptResources.defaultLibName) {
-        syntaxTree
-      } else {
-        Undefined.instance
-      }
+      syntaxTree.get(fileName.toString).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
-      if (fileName.toString == ScriptResources.defaultLibName) {
-        sourceUnit
-      } else {
-        Undefined.instance
-      }
+      sourceUnit.get(fileName.toString).getOrElse(Undefined.instance)
     }))
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
@@ -87,8 +79,14 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable) {
-    put(VarName.ts4sDefaultLibName, ScriptResources.defaultLibName, scope)
-    put(VarName.ts4sDefaultLibSnapshot, getScriptSnapshot(cx, scope, ScriptResources.defaultLib), scope)
+    val libs = ScriptResources.defaultLibNames map { name =>
+      val lib = cx.newObject(scope)
+      putProperty(lib, "name", name)
+      putProperty(lib, "snapshot", getScriptSnapshot(cx, scope, ScriptResources.defaultLibs(name)))
+      lib.asInstanceOf[Object]
+    }
+    val ts4sDefaultLibs = cx.newArray(scope, libs.toArray)
+    put(VarName.ts4sDefaultLibs, ts4sDefaultLibs, scope)
   }
 
   private[this] def getScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
@@ -135,7 +133,6 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sHost = "ts4sHost"
     val ts4sSettings = "ts4sSettings"
     val ts4sInputFiles = "ts4sInputFiles"
-    val ts4sDefaultLibName = "ts4sDefaultLibName"
-    val ts4sDefaultLibSnapshot = "ts4sDefaultLibSnapshot"
+    val ts4sDefaultLibs = "ts4sDefaultLibs"
   }
 }
