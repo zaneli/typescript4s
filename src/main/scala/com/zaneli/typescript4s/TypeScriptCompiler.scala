@@ -1,7 +1,7 @@
 package com.zaneli.typescript4s
 
 import java.io.File
-import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, Scriptable, WrappedException }
+import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, NativeObject, Scriptable, WrappedException }
 import org.mozilla.javascript.tools.shell.Global
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.Duration
@@ -73,8 +73,9 @@ object TypeScriptCompiler {
   private[this] def execute(src: File, options: CompileOptions): Unit = synchronized {
     withContext { cx =>
       val executeScope = cx.newObject(globalScope)
-      ScriptableObjectHelper.addSettings(cx, executeScope, options)
+      val settings = ScriptableObjectHelper.addSettings(cx, executeScope, options)
       ScriptableObjectHelper.addInputFiles(cx, executeScope, src)
+      ScriptableObjectHelper.addSyntaxTreeHolder(cx, executeScope, settings)
       cx.evaluateString(executeScope, ScriptResources.ts4s, "ts4s.js", 1, null)
     }
   }
@@ -91,6 +92,36 @@ object TypeScriptCompiler {
 
   private[this] def getDestFilePath(dir: File, srcName: String, ext: String): File = {
     new File(dir, s"${srcName}.${ext}")
+  }
+
+  private[typescript4s] def evalSyntaxTree(
+    scope: Scriptable, nameSnapshots: Seq[(String, Object)], settings: Object): Map[File, Future[Object]] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    (nameSnapshots.map {
+      case (name, snapshot) =>
+        val f = Future {
+          withContext { cx =>
+            val tmpScope = cx.newObject(scope)
+            tmpScope.put("ts4sFilePath", tmpScope, name)
+            tmpScope.put("ts4sSnapshot", tmpScope, snapshot)
+            tmpScope.put("ts4sSettings", tmpScope, settings)
+            cx.evaluateString(
+              tmpScope,
+              """
+              TypeScript.Parser.parse(
+                ts4sFilePath,
+                TypeScript.SimpleText.fromScriptSnapshot(ts4sSnapshot),
+                TypeScript.isDTSFile(ts4sFilePath),
+                TypeScript.getParseOptions(ts4sSettings));
+              """,
+              "syntaxTree.js",
+              1,
+              null)
+          }
+        }
+        (new File(name) -> f)
+    }).toMap
   }
 
   private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Object] = {

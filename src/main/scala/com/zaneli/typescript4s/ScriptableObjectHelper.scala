@@ -2,8 +2,10 @@ package com.zaneli.typescript4s
 
 import java.io.File
 import org.apache.commons.io.FileUtils
-import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined }
+import org.mozilla.javascript.{ BaseFunction, Context, NativeArray, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.duration.Duration
 
 private[typescript4s] object ScriptableObjectHelper {
 
@@ -52,7 +54,7 @@ private[typescript4s] object ScriptableObjectHelper {
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
 
-  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): Unit = {
+  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): Object = {
     val mutableSettings = cx.evaluateString(
       scope, "new TypeScript.CompilationSettings()", "", 1, null).asInstanceOf[NativeObject]
     putProperty(mutableSettings, "removeComments", options.removeComments)
@@ -71,6 +73,7 @@ private[typescript4s] object ScriptableObjectHelper {
     val immutableSettings = cx.evaluateString(
       tmpScope, "TypeScript.ImmutableCompilationSettings.fromCompilationSettings(mutableSettings)", "", 1, null)
     put(VarName.ts4sSettings, immutableSettings, scope)
+    immutableSettings
   }
 
   private[typescript4s] def addInputFiles(cx: Context, scope: Scriptable, src: File): Unit = {
@@ -87,6 +90,23 @@ private[typescript4s] object ScriptableObjectHelper {
     }
     val ts4sDefaultLibs = cx.newArray(scope, libs.toArray)
     put(VarName.ts4sDefaultLibs, ts4sDefaultLibs, scope)
+  }
+
+  private[typescript4s] def addSyntaxTreeHolder(cx: Context, scope: Scriptable, settings: Object): Unit = {
+    val ts4sSyntaxTreeHolder = cx.newObject(scope)
+    var syntaxTrees: Map[File, Future[Object]] = Map()
+    putProperty(ts4sSyntaxTreeHolder, "load", function({ files =>
+      val nameSnapshots = files.asInstanceOf[NativeArray].toArray map (_.asInstanceOf[NativeObject]) map { file =>
+        val name = file.get("path").toString
+        val snapshot = getScriptSnapshot(cx, scope, FileUtils.readFileToString(new File(name)))
+        (name, snapshot)
+      }
+      syntaxTrees = TypeScriptCompiler.evalSyntaxTree(scope, nameSnapshots, settings)
+    }))
+    putProperty(ts4sSyntaxTreeHolder, "get", function({ file =>
+      syntaxTrees.get(new File(file.toString)).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
+    }))
+    put("ts4sSyntaxTreeHolder", ts4sSyntaxTreeHolder, scope)
   }
 
   private[this] def getScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {

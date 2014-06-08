@@ -13,6 +13,10 @@
       throw d.message();
     }
   });
+
+  ts4sSyntaxTreeHolder.load(result.resolvedFiles);
+  compiler.ts4sSyntaxTreeHolder = ts4sSyntaxTreeHolder;
+
   result.resolvedFiles.forEach(function (f) {
     compiler.addFile(f.path, ts4sHost.getScriptSnapshot(f.path), TypeScript.ByteOrderMark.None, 0, false, []);
   });

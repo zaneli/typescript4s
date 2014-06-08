@@ -27680,6 +27680,9 @@ var TypeScript;
 
                 result = ts4sUtil.getDefaultLibSyntaxTree(this.fileName);
                 if (!result) {
+                    result = this._compiler.ts4sSyntaxTreeHolder.get(this.fileName);
+                }
+                if (!result) {
                     result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
                 }
 
