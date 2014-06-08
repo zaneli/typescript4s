@@ -1,7 +1,15 @@
 package com.zaneli.typescript4s
 
 import java.io.File
-import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, NativeObject, Scriptable, WrappedException }
+import org.mozilla.javascript.{
+  Context,
+  ContextFactory,
+  JavaScriptException,
+  NativeArray,
+  NativeObject,
+  Scriptable,
+  WrappedException
+}
 import org.mozilla.javascript.tools.shell.Global
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.Duration
@@ -24,7 +32,8 @@ object TypeScriptCompiler {
 
     val syntaxTree = evalSyntaxTree(scope)
     val sourceUnit = evalSourceUnit(cx, scope, syntaxTree)
-    ScriptableObjectHelper.addUtil(cx, scope, syntaxTree, sourceUnit)
+    ScriptableObjectHelper.addUtil(
+      cx, scope, syntaxTree.map { case (name, (s, _, _)) => (name -> s) }, sourceUnit)
     scope
   }
 
@@ -124,7 +133,7 @@ object TypeScriptCompiler {
     }).toMap
   }
 
-  private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Object] = {
+  private[this] def evalSyntaxTree(scope: Scriptable): Map[String, (Object, Object, Object)] = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     val fs = ScriptResources.defaultLibNames.zipWithIndex map {
@@ -134,16 +143,17 @@ object TypeScriptCompiler {
           val syntaxTree = cx.evaluateString(
             tmpScope,
             s"""
-            TypeScript.Parser.parse(
+            var syntaxTree = TypeScript.Parser.parse(
               ts4sDefaultLibs[${index}].name,
               TypeScript.SimpleText.fromScriptSnapshot(ts4sDefaultLibs[${index}].snapshot),
               TypeScript.isDTSFile(ts4sDefaultLibs[${index}].name),
               TypeScript.getParseOptions(TypeScript.ImmutableCompilationSettings.defaultSettings()));
+            [syntaxTree, syntaxTree.sourceUnit(), syntaxTree.lineMap()]
             """,
             "syntaxTree.js",
             1,
-            null)
-          (name -> syntaxTree)
+            null).asInstanceOf[NativeArray].toArray
+          (name -> (syntaxTree(0), syntaxTree(1), syntaxTree(2)))
         }
       }
     }
@@ -151,44 +161,25 @@ object TypeScriptCompiler {
   }
 
   private[this] def evalSourceUnit(
-    cx: Context, scope: Scriptable, syntaxTree: Map[String, Object]): Map[String, Object] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+    cx: Context, scope: Scriptable, syntaxTree: Map[String, (Object, Object, Object)]): Map[String, Object] = {
 
-    val fs = ScriptResources.defaultLibNames map { name =>
-      Future {
-        withContext { cx =>
-          val tmpScope = cx.newObject(scope)
-          tmpScope.put("ts4sSyntaxTree", tmpScope, syntaxTree(name))
-          val sourceUnit = cx.evaluateString(
-            tmpScope,
-            s"""
-            var ts4sSourceUnit = ts4sSyntaxTree.sourceUnit();
-            var ts4sLineMap = ts4sSyntaxTree.lineMap();
-            """,
-            "sourceUnitLineMap.js",
-            1,
-            null)
-          (name -> (tmpScope.get("ts4sSourceUnit", tmpScope), tmpScope.get("ts4sLineMap", tmpScope)))
-        }
-      }
-    }
-    (Await.result(Future.sequence(fs), Duration.Inf).toMap map {
-      case (name, (s, l)) =>
-        val tmpScope = cx.newObject(scope)
-        tmpScope.put("ts4sSourceUnit", tmpScope, s)
-        tmpScope.put("ts4sLineMap", tmpScope, l)
-        val sourceUnit = cx.evaluateString(
-          tmpScope,
-          s"""
-          ts4sSourceUnit.accept(new TypeScript.SyntaxTreeToAstVisitor(
-            "${name}",
-            ts4sLineMap,
-            TypeScript.ImmutableCompilationSettings.defaultSettings()));
-          """,
-          "sourceUnitAccept.js",
-          1,
-          null)
-        (name -> sourceUnit)
+    (ScriptResources.defaultLibNames map { name =>
+      val tmpScope = cx.newObject(scope)
+      val (_, s, l) = syntaxTree(name)
+      tmpScope.put("ts4sSourceUnit", tmpScope, s)
+      tmpScope.put("ts4sLineMap", tmpScope, l)
+      val sourceUnit = cx.evaluateString(
+        tmpScope,
+        s"""
+        ts4sSourceUnit.accept(new TypeScript.SyntaxTreeToAstVisitor(
+          "${name}",
+          ts4sLineMap,
+          TypeScript.ImmutableCompilationSettings.defaultSettings()));
+        """,
+        "sourceUnit.js",
+        1,
+        null)
+      (name -> sourceUnit)
     }).toMap
   }
 
