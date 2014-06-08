@@ -5,29 +5,18 @@ Scala library to compile [TypeScript](http://www.typescriptlang.org/)
 
 ## Usage
 
-* compile
 ```
+scala> import com.zaneli.typescript4s.TypeScriptCompiler
 import com.zaneli.typescript4s.TypeScriptCompiler
 
-val compiler = new TypeScriptCompiler()
-val dest = compiler.compile(new java.io.File("example.ts"))
-val destExcludeComments = compiler.compile(new java.io.File("example.ts"), removeComments = true)
-compiler.execute("example.ts", "--removeComments")
-```
-compile method return compiled JavaScript file path.
+scala> val dest = TypeScriptCompiler.compile(new java.io.File("example.ts"))
+dest: Seq[java.io.File] = List(example.js)
 
-* show help
-```
-TypeScriptCompiler.help()
-compiler.execute("-h")
-compiler.execute("--help")
-```
+scala> val dest = TypeScriptCompiler.compile(new java.io.File("example.ts"), out = new java.io.File("dest.js"))
+dest: Seq[java.io.File] = List(dest.js)
 
-* show version
-```
-TypeScriptCompiler.version()
-compiler.execute("-v")
-compiler.execute("--version")
+scala> val dest = TypeScriptCompiler.compile(new java.io.File("example.ts"), declaration = true, sourcemap = true)
+dest: Seq[java.io.File] = List(example.js, example.d.ts, example.js.map)
 ```
 
 ## Credit
