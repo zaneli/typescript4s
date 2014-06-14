@@ -40,16 +40,16 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def addUtil(
-    cx: Context, scope: Scriptable, syntaxTree: Map[String, Object], sourceUnit: Map[String, Object]): Unit = {
+    cx: Context, scope: Scriptable, syntaxTree: Map[String, Future[Object]], sourceUnit: Map[String, Future[Object]]): Unit = {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
       ScriptResources.defaultLibNames.contains(fileName)
     }))
     putProperty(ts4sUtil, "getDefaultLibSyntaxTree", function({ fileName =>
-      syntaxTree.get(fileName.toString).getOrElse(Undefined.instance)
+      syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
-      sourceUnit.get(fileName.toString).getOrElse(Undefined.instance)
+      sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }

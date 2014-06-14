@@ -6306,6 +6306,10 @@ var TypeScript;
         };
 
         Scanner.scanTrivia = function (text, start, length, isTrailing) {
+            return sync(this.ts4sScanTrivia)(text, start, length, isTrailing);
+        };
+
+        Scanner.ts4sScanTrivia = function (text, start, length, isTrailing) {
             var scanner = new Scanner(null, text.subText(new TypeScript.TextSpan(start, length)), 1 /* EcmaScript5 */, Scanner.triviaWindow);
             return scanner.scanTrivia(text, start, isTrailing);
         };
