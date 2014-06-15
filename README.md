@@ -20,5 +20,5 @@ dest: Seq[java.io.File] = List(example.js, example.d.ts, example.js.map)
 ```
 
 ## Credit
-* typescript4s include tsc.js and lib.d.ts from TypeScript licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)  
+* typescript4s include typescript.js and lib.d.ts from TypeScript licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)  
 * typescript4s consulted [typescript4j](https://github.com/martypitt/typescript4j)

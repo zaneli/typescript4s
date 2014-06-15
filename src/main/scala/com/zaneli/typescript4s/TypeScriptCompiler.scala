@@ -16,7 +16,7 @@ object TypeScriptCompiler {
     val global = new Global()
     global.init(cx)
     val scope = cx.initStandardObjects(global)
-    cx.evaluateString(scope, ScriptResources.tsServices, "typescriptServices.js", 1, null)
+    cx.evaluateString(scope, ScriptResources.typescriptJs, "typescript.js", 1, null)
     ScriptableObjectHelper.addHost(cx, scope)
     ScriptableObjectHelper.addEnv(cx, scope)
     ScriptableObjectHelper.addDefaultLibInfo(cx, scope)
@@ -75,7 +75,7 @@ object TypeScriptCompiler {
       val settings = ScriptableObjectHelper.addSettings(cx, executeScope, options)
       ScriptableObjectHelper.addInputFiles(cx, executeScope, src)
       ScriptableObjectHelper.addSyntaxTreeHolder(cx, executeScope, settings)
-      cx.evaluateString(executeScope, ScriptResources.ts4s, "ts4s.js", 1, null)
+      cx.evaluateString(executeScope, ScriptResources.ts4sJs, "ts4s.js", 1, null)
     }
   }
 

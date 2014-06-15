@@ -6221,6 +6221,10 @@ var TypeScript;
         };
 
         Scanner.scanTrivia = function (text, start, length, isTrailing) {
+            return sync(this.ts4sScanTrivia)(text, start, length, isTrailing);
+        };
+
+        Scanner.ts4sScanTrivia = function (text, start, length, isTrailing) {
             var scanner = new Scanner(null, text.subText(new TypeScript.TextSpan(start, length)), 1 /* EcmaScript5 */, Scanner.triviaWindow);
             return scanner.scanTrivia(text, start, isTrailing);
         };
@@ -27534,7 +27538,10 @@ var TypeScript;
             if (!this._sourceUnit) {
                 var start = new Date().getTime();
                 var syntaxTree = this.syntaxTree();
-                this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
+                this._sourceUnit = ts4sUtil.getDefaultLibSourceUnit(this.fileName);
+                if (!this._sourceUnit) {
+                    this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
+                }
                 TypeScript.astTranslationTime += new Date().getTime() - start;
 
                 if (!this.isOpen) {
@@ -27590,7 +27597,13 @@ var TypeScript;
             if (!result) {
                 var start = new Date().getTime();
 
-                result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
+                result = ts4sUtil.getDefaultLibSyntaxTree(this.fileName);
+                if (!result) {
+                    result = this._compiler.ts4sSyntaxTreeHolder.get(this.fileName);
+                }
+                if (!result) {
+                    result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
+                }
 
                 TypeScript.syntaxTreeParseTime += new Date().getTime() - start;
 
@@ -56115,6 +56128,10 @@ var TypeScript;
             TypeScript.Debug.assert(this.index >= 0 && this.index < this.fileNames.length);
             var fileName = this.fileNames[this.index];
 
+            if (ts4sUtil.isDefaultLib(fileName)) {
+                return true;
+            }
+
             var diagnostics = this.compiler.getSyntacticDiagnostics(fileName);
             if (diagnostics.length) {
                 if (!this.continueOnDiagnostics) {
@@ -56134,6 +56151,11 @@ var TypeScript;
 
             TypeScript.Debug.assert(this.index >= 0 && this.index < this.fileNames.length);
             var fileName = this.fileNames[this.index];
+
+            if (ts4sUtil.isDefaultLib(fileName)) {
+                return true;
+            }
+
             var diagnostics = this.compiler.getSemanticDiagnostics(fileName);
             if (diagnostics.length) {
                 if (!this.continueOnDiagnostics) {
