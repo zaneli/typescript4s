@@ -1,7 +1,8 @@
 package com.zaneli.typescript4s
 
 import java.io.File
-import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, Scriptable, WrappedException }
+import org.apache.commons.io.FileUtils
+import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, Scriptable, Undefined, WrappedException }
 import org.mozilla.javascript.tools.shell.Global
 import scala.concurrent.Future
 
@@ -74,7 +75,7 @@ object TypeScriptCompiler {
       val executeScope = cx.newObject(globalScope)
       val settings = ScriptableObjectHelper.addSettings(cx, executeScope, options)
       ScriptableObjectHelper.addInputFiles(cx, executeScope, src)
-      ScriptableObjectHelper.addSyntaxTreeHolder(cx, executeScope, settings)
+      ScriptableObjectHelper.addPrepareResource(cx, executeScope, settings)
       cx.evaluateString(executeScope, ScriptResources.ts4sJs, "ts4s.js", 1, null)
     }
   }
@@ -93,85 +94,64 @@ object TypeScriptCompiler {
     new File(dir, s"${srcName}.${ext}")
   }
 
-  private[typescript4s] def evalSyntaxTree(
-    scope: Scriptable, nameSnapshots: Seq[(String, Object)], settings: Object): Map[File, Future[Object]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-
-    (nameSnapshots.map {
-      case (name, snapshot) =>
-        val f = Future {
-          withContext { cx =>
-            val tmpScope = cx.newObject(scope)
-            tmpScope.put("ts4sFilePath", tmpScope, name)
-            tmpScope.put("ts4sSnapshot", tmpScope, snapshot)
-            tmpScope.put("ts4sSettings", tmpScope, settings)
-            cx.evaluateString(
-              tmpScope,
-              """
-              TypeScript.Parser.parse(
-                ts4sFilePath,
-                TypeScript.SimpleText.fromScriptSnapshot(ts4sSnapshot),
-                TypeScript.isDTSFile(ts4sFilePath),
-                TypeScript.getParseOptions(ts4sSettings));
-              """,
-              "syntaxTree.js",
-              1,
-              null)
-          }
-        }
-        (new File(name) -> f)
-    }).toMap
-  }
-
   private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Future[Object]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-
     (ScriptResources.defaultLibNames.zipWithIndex map {
       case (name, index) =>
-        val syntaxTree = Future {
-          withContext { cx =>
-            val tmpScope = cx.newObject(scope)
-            cx.evaluateString(
-              tmpScope,
-              s"""
-              TypeScript.Parser.parse(
-                ts4sDefaultLibs[${index}].name,
-                TypeScript.SimpleText.fromScriptSnapshot(ts4sDefaultLibs[${index}].snapshot),
-                TypeScript.isDTSFile(ts4sDefaultLibs[${index}].name),
-                TypeScript.getParseOptions(TypeScript.ImmutableCompilationSettings.defaultSettings()));
-              """,
-              "syntaxTree.js",
-              1,
-              null)
-          }
-        }
+        val syntaxTree = evalSynaxTree(scope, name, ScriptResources.defaultLibs(name))
         (name -> syntaxTree)
     }).toMap
   }
 
   private[this] def evalSourceUnit(scope: Scriptable, fs: Map[String, Future[Object]]): Map[String, Future[Object]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+    (ScriptResources.defaultLibNames map (name => (name -> evalSourceUnit(scope, fs(name))))).toMap
+  }
 
-    (ScriptResources.defaultLibNames map { name =>
-      val sourceUnit = fs(name).map { syntaxTree =>
-        withContext { cx =>
-          val tmpScope = cx.newObject(scope)
-          tmpScope.put("ts4sSyntaxTree", tmpScope, syntaxTree)
-          cx.evaluateString(
-            tmpScope,
-            s"""
-            ts4sSyntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
-              "${name}",
-              ts4sSyntaxTree.lineMap(),
-              TypeScript.ImmutableCompilationSettings.defaultSettings()));
-            """,
-            "sourceUnit.js",
-            1,
-            null)
-        }
+  private[typescript4s] def evalSynaxTree(
+    scope: Scriptable, name: String, content: String, settings: Option[Object] = None): Future[Object] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    Future {
+      withContext { cx =>
+        val tmpScope = cx.newObject(scope)
+        tmpScope.put("ts4sFilePath", tmpScope, name)
+        tmpScope.put("ts4sContent", tmpScope, content)
+        tmpScope.put("ts4sSettings", tmpScope, settings.getOrElse(Undefined.instance))
+        cx.evaluateString(
+          tmpScope,
+          """
+          TypeScript.Parser.parse(
+            ts4sFilePath,
+            TypeScript.SimpleText.fromString(ts4sContent),
+            TypeScript.isDTSFile(ts4sFilePath),
+            TypeScript.getParseOptions(ts4sSettings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
+          """,
+          "syntaxTree.js",
+          1,
+          null)
       }
-      (name -> sourceUnit)
-    }).toMap
+    }
+  }
+
+  private[typescript4s] def evalSourceUnit(
+    scope: Scriptable, syntaxTree: Future[Object], settings: Option[Object] = None): Future[Object] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    syntaxTree map { s =>
+      withContext { cx =>
+        val tmpScope = cx.newObject(scope)
+        tmpScope.put("ts4sSyntaxTree", tmpScope, s)
+        tmpScope.put("ts4sSettings", tmpScope, settings.getOrElse(Undefined.instance))
+        cx.evaluateString(
+          tmpScope,
+          s"""
+            ts4sSyntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
+              ts4sSyntaxTree.fileName(),
+              ts4sSyntaxTree.lineMap(),
+              ts4sSettings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
+            """,
+          "sourceUnit.js",
+          1,
+          null)
+      }
+    }
   }
 
   private[this] def withContext[A](f: Context => A): A = try {
