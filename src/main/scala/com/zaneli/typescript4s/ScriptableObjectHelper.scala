@@ -1,6 +1,7 @@
 package com.zaneli.typescript4s
 
 import java.io.File
+import com.zaneli.typescript4s.ScriptEvaluator.{ evalScriptSnapshot, evalSourceUnit, evalSynaxTree }
 import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.{ BaseFunction, Context, NativeArray, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
@@ -34,7 +35,7 @@ private[typescript4s] object ScriptableObjectHelper {
       }
     }))
     putProperty(ts4sHost, "getScriptSnapshot", function({ fileName =>
-      getScriptSnapshot(cx, scope, FileUtils.readFileToString(new File(fileName.toString)))
+      evalScriptSnapshot(cx, scope, FileUtils.readFileToString(new File(fileName.toString)))
     }))
     put(VarName.ts4sHost, ts4sHost, scope)
   }
@@ -85,7 +86,7 @@ private[typescript4s] object ScriptableObjectHelper {
     val libs = ScriptResources.defaultLibNames map { name =>
       val lib = cx.newObject(scope)
       putProperty(lib, "name", name)
-      putProperty(lib, "snapshot", getScriptSnapshot(cx, scope, ScriptResources.defaultLibs(name)))
+      putProperty(lib, "snapshot", evalScriptSnapshot(cx, scope, ScriptResources.defaultLibs(name)))
       lib.asInstanceOf[Object]
     }
     val ts4sDefaultLibs = cx.newArray(scope, libs.toArray)
@@ -100,11 +101,11 @@ private[typescript4s] object ScriptableObjectHelper {
       val syntaxTrees = (files.asInstanceOf[NativeArray].toArray map (_.asInstanceOf[NativeObject]) map { f =>
         val name = f.get("path").toString
         val file = new File(name)
-        val syntaxTree = TypeScriptCompiler.evalSynaxTree(scope, name, FileUtils.readFileToString(file), Some(settings))
+        val syntaxTree = evalSynaxTree(scope, name, FileUtils.readFileToString(file), Some(settings))
         (file -> syntaxTree)
       }).toMap
       sourceUnits = (syntaxTrees map {
-        case (file, f) => (file -> TypeScriptCompiler.evalSourceUnit(scope, f, Some(settings)))
+        case (file, f) => (file -> evalSourceUnit(scope, f, Some(settings)))
       }).toMap
     }))
     putProperty(ts4sPrepareResource, "getSyntaxTree", function({ file =>
@@ -114,12 +115,6 @@ private[typescript4s] object ScriptableObjectHelper {
       sourceUnits.get(new File(file.toString)).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
     put(VarName.ts4sPrepareResource, ts4sPrepareResource, scope)
-  }
-
-  private[this] def getScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
-    val tmpScope = cx.newObject(scope)
-    tmpScope.put(s"content", tmpScope, content)
-    cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js", 1, null)
   }
 
   private[this] def put(name: String, obj: Any, scope: Scriptable) {
