@@ -7,7 +7,7 @@
     compiler.addFile(lib.name, lib.snapshot, TypeScript.ByteOrderMark.None, 0, false, []);
   });
 
-  var result = TypeScript.ReferenceResolver.resolve(ts4sInputFiles, ts4sHost);
+  var result = TypeScript.ReferenceResolver.resolve(ts4sFileInfo.srcFiles, ts4sHost);
   result.diagnostics.forEach(function (d) {
     if (d.info().category === TypeScript.DiagnosticCategory.Error) {
       throw d.message();
@@ -29,6 +29,7 @@
     });
     result.outputFiles.forEach(function (f) {
       TypeScript.Environment.writeFile(f.name, f.text, TypeScript.ByteOrderMark.None);
+      ts4sFileInfo.addDestFile(f.name);
     });
   }
 })();

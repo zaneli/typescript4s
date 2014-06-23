@@ -1,7 +1,7 @@
 package com.zaneli.typescript4s
 
-import java.io.File
 import com.zaneli.typescript4s.ScriptEvaluator.{ evalScriptSnapshot, evalSourceUnit, evalSynaxTree }
+import java.io.File
 import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.{ BaseFunction, Context, NativeArray, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
@@ -77,9 +77,18 @@ private[typescript4s] object ScriptableObjectHelper {
     immutableSettings
   }
 
-  private[typescript4s] def addInputFiles(cx: Context, scope: Scriptable, src: File): Unit = {
-    val inputFiles = cx.newArray(scope, Array[Object](src.getAbsolutePath))
-    put(VarName.ts4sInputFiles, inputFiles, scope)
+  private[typescript4s] def addFileInfo(cx: Context, scope: Scriptable, src: Seq[File]): scala.collection.mutable.ListBuffer[File] = {
+
+    val ts4sFileInfo = cx.newObject(scope)
+    val inputFiles = cx.newArray(scope, src.map(_.getAbsolutePath.asInstanceOf[Object]).toArray)
+    putProperty(ts4sFileInfo, "srcFiles", inputFiles)
+
+    val dest: scala.collection.mutable.ListBuffer[File] = scala.collection.mutable.ListBuffer()
+    putProperty(ts4sFileInfo, "addDestFile", function({ (file) =>
+      dest += new File(file.toString)
+    }))
+    put(VarName.ts4sFileInfo, ts4sFileInfo, scope)
+    dest
   }
 
   private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable) {
@@ -154,7 +163,7 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sUtil = "ts4sUtil"
     val ts4sHost = "ts4sHost"
     val ts4sSettings = "ts4sSettings"
-    val ts4sInputFiles = "ts4sInputFiles"
+    val ts4sFileInfo = "ts4sFileInfo"
     val ts4sDefaultLibs = "ts4sDefaultLibs"
     val ts4sPrepareResource = "ts4sPrepareResource"
   }

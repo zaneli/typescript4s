@@ -16,7 +16,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDests = TypeScriptCompiler.compile(src)
+      val actualDests = new TypeScriptCompiler().compile(src)
       actualDests must have size 1
       val actualDest = actualDests(0)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -29,7 +29,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDests = TypeScriptCompiler.compile(src)
+      val actualDests = new TypeScriptCompiler().compile(src)
       actualDests must have size 1
       val actualDest = actualDests(0)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -42,7 +42,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      val actualDests = TypeScriptCompiler.compile(src)
+      val actualDests = new TypeScriptCompiler().compile(src)
       actualDests must have size 1
       val actualDest = actualDests(0)
       actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -55,7 +55,7 @@ class TypeScriptCompilerSpec extends Specification {
       destFiles += expectedDest
       expectedDest.exists must beFalse
 
-      TypeScriptCompiler.compile(src) must throwA[TypeScriptCompilerException]
+      new TypeScriptCompiler().compile(src) must throwA[TypeScriptCompilerException]
     }
 
     "option" in {
@@ -65,7 +65,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDests = TypeScriptCompiler.compile(src, removeComments = true)
+        val actualDests = new TypeScriptCompiler().removeComments(true).compile(src)
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -78,7 +78,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDests = TypeScriptCompiler.compile(src, out = expectedDest)
+        val actualDests = new TypeScriptCompiler().out(expectedDest).compile(src)
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -91,7 +91,7 @@ class TypeScriptCompilerSpec extends Specification {
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
-        val actualDests = TypeScriptCompiler.compile(src, outDir = expectedDest.getParentFile)
+        val actualDests = new TypeScriptCompiler().outDir(expectedDest.getParentFile).compile(src)
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
@@ -106,14 +106,10 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDestJs.exists must beFalse
         expectedDestDts.exists must beFalse
 
-        val actualDests = TypeScriptCompiler.compile(src, declaration = true)
+        val actualDests = new TypeScriptCompiler().declaration(true).compile(src)
         actualDests must have size 2
-        val actualDestJs = actualDests(0)
-        actualDestJs.getAbsolutePath must_== expectedDestJs.getAbsolutePath
-        getContents(actualDestJs) must_== getContents("/js/with-declaration.js")
-        val actualDestDts = actualDests(1)
-        actualDestDts.getAbsolutePath must_== expectedDestDts.getAbsolutePath
-        getContents(actualDestDts) must_== getContents("/ts/typings/with-declaration.d.ts")
+        actualDests.map(_.getAbsolutePath) must contain(expectedDestJs.getAbsolutePath, expectedDestDts.getAbsolutePath)
+        actualDests.map(getContents) must contain(getContents("/js/with-declaration.js"), getContents("/ts/typings/with-declaration.d.ts"))
       }
       "sourcemap" in new context {
         val src = getPath("/ts/sourcemap.ts")
@@ -124,14 +120,10 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDestJs.exists must beFalse
         expectedDestMap.exists must beFalse
 
-        val actualDests = TypeScriptCompiler.compile(src, sourcemap = true)
+        val actualDests = new TypeScriptCompiler().sourcemap(true).compile(src)
         actualDests must have size 2
-        val actualDestJs = actualDests(0)
-        actualDestJs.getAbsolutePath must_== expectedDestJs.getAbsolutePath
-        getContents(actualDestJs) must_== getContents("/js/sourcemap.js")
-        val actualDestMap = actualDests(1)
-        actualDestMap.getAbsolutePath must_== expectedDestMap.getAbsolutePath
-        getContents(actualDestMap) must_== getContents("/sourcemap/sourcemap.js.map")
+        actualDests.map(_.getAbsolutePath) must contain(expectedDestJs.getAbsolutePath, expectedDestMap.getAbsolutePath)
+        actualDests.map(getContents) must contain(getContents("/js/sourcemap.js"), getContents("/sourcemap/sourcemap.js.map"))
       }
     }
   }

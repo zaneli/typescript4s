@@ -1,75 +1,51 @@
 package com.zaneli.typescript4s
 
 import com.zaneli.typescript4s.ScriptEvaluator.{ globalScope, withContext }
-import com.zaneli.typescript4s.ScriptableObjectHelper.{ addInputFiles, addPrepareResource, addSettings }
+import com.zaneli.typescript4s.ScriptableObjectHelper.{ addFileInfo, addPrepareResource, addSettings }
 import java.io.File
 
-object TypeScriptCompiler {
+class TypeScriptCompiler(options: CompileOptions = CompileOptions()) {
 
-  def compile(
-    src: File,
-    out: File = null,
-    outDir: File = null,
-    mapRoot: File = null,
-    sourceRoot: File = null,
-    module: ModuleKind = ModuleKind.Unspecified,
-    target: ECMAVersion = ECMAVersion.ES3,
-    removeComments: Boolean = false,
-    noImplicitAny: Boolean = false,
-    declaration: Boolean = false,
-    sourcemap: Boolean = false): Seq[File] = {
-    compile(src, CompileOptions(out, outDir, mapRoot, sourceRoot, module, target, removeComments, noImplicitAny, declaration, sourcemap))
+  def out(file: File): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(out = file))
   }
-  def compile(src: File, options: CompileOptions): Seq[File] = {
-    execute(src, options)
-
-    val (destDir, fileName) = getDestInfo(src, options)
-    val destFile = getDestFilePath(destDir, fileName, "js")
-    if (!destFile.isFile) {
-      throw new TypeScriptCompilerException(s"${destFile.getAbsolutePath} file not found.")
-    }
-
-    val files = new scala.collection.mutable.ListBuffer[File]()
-    files += destFile
-    if (options.declaration) {
-      val declarationFile = getDestFilePath(destDir, fileName, "d.ts")
-      if (!declarationFile.isFile) {
-        throw new TypeScriptCompilerException(s"${declarationFile.getAbsolutePath} file not found.")
-      }
-      files += declarationFile
-    }
-    if (options.sourcemap) {
-      val sourcemapFile = getDestFilePath(destDir, fileName, "js.map")
-      if (!sourcemapFile.isFile) {
-        throw new TypeScriptCompilerException(s"${sourcemapFile.getAbsolutePath} file not found.")
-      }
-      files += sourcemapFile
-    }
-    files.toSeq
+  def outDir(file: File): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(outDir = file))
+  }
+  def mapRoot(file: File): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(mapRoot = file))
+  }
+  def sourceRoot(file: File): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(sourceRoot = file))
+  }
+  def module(kind: ModuleKind): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(module = kind))
+  }
+  def target(version: ECMAVersion): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(target = version))
+  }
+  def removeComments(flag: Boolean): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(removeComments = flag))
+  }
+  def noImplicitAny(flag: Boolean): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(noImplicitAny = flag))
+  }
+  def declaration(flag: Boolean): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(declaration = flag))
+  }
+  def sourcemap(flag: Boolean): TypeScriptCompiler = {
+    new TypeScriptCompiler(options.copy(sourcemap = flag))
   }
 
-  private[this] def execute(src: File, options: CompileOptions): Unit = synchronized {
+  def compile(src: File*): Seq[File] = ScriptEvaluator.synchronized {
     withContext { cx =>
       val executeScope = cx.newObject(globalScope)
       val settings = addSettings(cx, executeScope, options)
-      addInputFiles(cx, executeScope, src)
+      val dest = addFileInfo(cx, executeScope, src)
       addPrepareResource(cx, executeScope, settings)
       cx.evaluateString(executeScope, ScriptResources.ts4sJs, "ts4s.js", 1, null)
+      dest.toSeq
     }
-  }
-
-  private[this] def getDestInfo(src: File, options: CompileOptions): (File, String) = (options.outOpt, options.outDirOpt) match {
-    case (Some(file), _) => (file.getParentFile, getFileName(file))
-    case (_, Some(dir)) => (dir, getFileName(src))
-    case _ => (src.getParentFile, getFileName(src))
-  }
-
-  private[this] def getFileName(file: File): String = {
-    file.getName.split("""\.""").init.mkString(".")
-  }
-
-  private[this] def getDestFilePath(dir: File, srcName: String, ext: String): File = {
-    new File(dir, s"${srcName}.${ext}")
   }
 }
 

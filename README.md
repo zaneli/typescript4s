@@ -9,14 +9,14 @@ Scala library to compile [TypeScript](http://www.typescriptlang.org/)
 scala> import com.zaneli.typescript4s.TypeScriptCompiler
 import com.zaneli.typescript4s.TypeScriptCompiler
 
-scala> val dest = TypeScriptCompiler.compile(new java.io.File("example.ts"))
+scala> val dest = new TypeScriptCompiler().compile(new java.io.File("example.ts"))
 dest: Seq[java.io.File] = List(example.js)
 
-scala> val dest = TypeScriptCompiler.compile(new java.io.File("example.ts"), out = new java.io.File("dest.js"))
+scala> val dest = new TypeScriptCompiler().out(new java.io.File("dest.js")).compile(new java.io.File("example.ts"))
 dest: Seq[java.io.File] = List(dest.js)
 
-scala> val dest = TypeScriptCompiler.compile(new java.io.File("example.ts"), declaration = true, sourcemap = true)
-dest: Seq[java.io.File] = List(example.js, example.d.ts, example.js.map)
+scala> val dest = new TypeScriptCompiler().declaration(true).sourcemap(true).compile(new java.io.File("example.ts"))
+dest: Seq[java.io.File] = List(example.js.map, example.js, example.d.ts)
 ```
 
 ## Credit
