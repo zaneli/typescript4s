@@ -55,7 +55,7 @@ private[typescript4s] object ScriptEvaluator {
           tmpScope,
           """
           TypeScript.Parser.parse(
-            ts4sFilePath,
+            TypeScript.switchToForwardSlashes(ts4sFilePath),
             TypeScript.SimpleText.fromString(ts4sContent),
             TypeScript.isDTSFile(ts4sFilePath),
             TypeScript.getParseOptions(ts4sSettings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
