@@ -42,7 +42,7 @@ private[typescript4s] object ScriptEvaluator {
     cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js", 1, null)
   }
 
-  private[typescript4s] def evalSynaxTree(
+  private[typescript4s] def evalSyntaxTree(
     scope: Scriptable, name: String, content: String, settings: Option[Object] = None): Future[Object] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     Future {
@@ -93,7 +93,7 @@ private[typescript4s] object ScriptEvaluator {
   private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Future[Object]] = {
     (ScriptResources.defaultLibNames.zipWithIndex map {
       case (name, index) =>
-        val syntaxTree = evalSynaxTree(scope, name, ScriptResources.defaultLibs(name))
+        val syntaxTree = evalSyntaxTree(scope, name, ScriptResources.defaultLibs(name))
         (name -> syntaxTree)
     }).toMap
   }

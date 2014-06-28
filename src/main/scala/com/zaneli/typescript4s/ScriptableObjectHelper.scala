@@ -1,6 +1,6 @@
 package com.zaneli.typescript4s
 
-import com.zaneli.typescript4s.ScriptEvaluator.{ evalScriptSnapshot, evalSourceUnit, evalSynaxTree }
+import com.zaneli.typescript4s.ScriptEvaluator.{ evalScriptSnapshot, evalSourceUnit, evalSyntaxTree }
 import java.io.File
 import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.{ BaseFunction, Context, NativeArray, NativeObject, Scriptable, Undefined }
@@ -110,7 +110,7 @@ private[typescript4s] object ScriptableObjectHelper {
       val syntaxTrees = (files.asInstanceOf[NativeArray].toArray map (_.asInstanceOf[NativeObject]) map { f =>
         val name = f.get("path").toString
         val file = new File(name)
-        val syntaxTree = evalSynaxTree(scope, name, FileUtils.readFileToString(file), Some(settings))
+        val syntaxTree = evalSyntaxTree(scope, name, FileUtils.readFileToString(file), Some(settings))
         (file -> syntaxTree)
       }).toMap
       sourceUnits = (syntaxTrees map {
