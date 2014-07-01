@@ -1,10 +1,13 @@
 package com.zaneli.typescript4s
 
-import com.zaneli.typescript4s.ScriptEvaluator.{ globalScope, withContext }
-import com.zaneli.typescript4s.ScriptableObjectHelper.{ addFileInfo, addPrepareResource, addSettings }
+import akka.actor.{ ActorSystem, Cancellable }
 import java.io.File
+import java.nio.file.FileSystems
+import org.slf4j.{ Logger, LoggerFactory }
+import java.nio.file.WatchService
 
 class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = CompileOptions()) {
+  import TypeScriptCompiler.{ as, logger, sep }
 
   def out(file: File): TypeScriptCompiler =
     new TypeScriptCompiler(src, options.copy(out = file))
@@ -28,18 +31,79 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
     new TypeScriptCompiler(src, options.copy(sourcemap = flag))
 
   def compile(): Seq[File] = ScriptEvaluator.synchronized {
-    withContext { cx =>
-      val executeScope = cx.newObject(globalScope)
-      val settings = addSettings(cx, executeScope, options)
-      val dest = addFileInfo(cx, executeScope, src)
-      addPrepareResource(cx, executeScope, settings)
-      cx.evaluateString(executeScope, ScriptResources.ts4sJs, "ts4s.js", 1, null)
-      dest.toSeq
+    val start = System.nanoTime
+    val (compiler, files) = ScriptEvaluator.resolve(src, options)
+    val dest = ScriptEvaluator.compile(compiler, files)
+    logger.debug(s"""Done. (${(System.nanoTime - start) / 1000000} ms)""")
+    dest
+  }
+
+  def watch(): Cancellable = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    import scala.collection.JavaConverters._
+    import scala.concurrent.duration._
+    import scala.language.postfixOps
+    import scala.util.{ Failure, Success, Try }
+    import java.nio.file.Path
+    import java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
+
+    val (compiler, files) = ScriptEvaluator.resolve(src, options)
+    ScriptEvaluator.compile(compiler, files)
+
+    var wss: Seq[(WatchService, Path, Seq[File])] = Nil
+
+    def mkWatchServices(files: Seq[File]) = {
+      wss = files.filter(_.isFile).groupBy(_.getParentFile.toPath).toSeq.map {
+        case (path, files) => {
+          val ws = path.getFileSystem.newWatchService()
+          val key = path.register(ws, ENTRY_MODIFY)
+          (ws, path, files)
+        }
+      }
+    }
+    def getWatchServices(): Seq[(WatchService, Path, Seq[File])] = {
+      wss
+    }
+    mkWatchServices(files)
+
+    as.scheduler.schedule(0 seconds, 1 seconds) {
+      val wss = getWatchServices()
+      val updateFiles = for (
+        (ws, path, files) <- wss;
+        key <- Option(ws.poll()).toSeq;
+        event <- key.pollEvents.asScala if event.kind == ENTRY_MODIFY && event.context.isInstanceOf[Path];
+        _ = key.reset();
+        file = path.resolve(event.context.asInstanceOf[Path]).toFile if files.contains(file)
+      ) yield {
+        file
+      }
+      if (updateFiles.nonEmpty) {
+        val start = System.nanoTime
+        val files = wss.flatMap(_._3)
+        logger.debug(s"""Recompiling (${files.mkString(sep, sep, "")}):""")
+        Try {
+          val (compiler, files) = ScriptEvaluator.resolve(src, options)
+          val dest = ScriptEvaluator.compile(compiler, files)
+          (files, dest)
+        } match {
+          case Success((newFiles, dest)) => {
+            if (newFiles != files) {
+              mkWatchServices(newFiles)
+            }
+            logger.debug(s"""Done. (${(System.nanoTime - start) / 1000000} ms) (${dest.mkString(sep, sep, "")}):""")
+          }
+          case Failure(t) => logger.warn("Recompile failed.", t)
+        }
+      }
     }
   }
 }
 
 object TypeScriptCompiler {
+  private val as = ActorSystem.create()
+  private val logger = LoggerFactory.getLogger(implicitly[scala.reflect.ClassTag[TypeScriptCompiler]].runtimeClass)
+  private val sep = s"""${System.getProperty("line.separator")}    """
+
   def apply(src: File*): TypeScriptCompiler = new TypeScriptCompiler(src)
 }
 

@@ -18,7 +18,6 @@ private[typescript4s] object ScriptResources {
   }
 
   private[typescript4s] lazy val typescriptJs = IOUtils.toString(this.getClass.getResourceAsStream("/tsc/typescript.js"))
-  private[typescript4s] lazy val ts4sJs = IOUtils.toString(this.getClass.getResourceAsStream("/tsc/ts4s.js"))
 
   private[this] val lineNums = List(974, 1912, 2832, 3761, 3941, 5912, 6703, 7489, 8425, 9340, 10334, 11215, 12203, 13244, 14958)
 }

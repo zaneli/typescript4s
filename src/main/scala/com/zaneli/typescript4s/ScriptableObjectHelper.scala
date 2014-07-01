@@ -77,21 +77,7 @@ private[typescript4s] object ScriptableObjectHelper {
     immutableSettings
   }
 
-  private[typescript4s] def addFileInfo(cx: Context, scope: Scriptable, src: Seq[File]): scala.collection.mutable.ListBuffer[File] = {
-
-    val ts4sFileInfo = cx.newObject(scope)
-    val inputFiles = cx.newArray(scope, src.map(_.getAbsolutePath.asInstanceOf[Object]).toArray)
-    putProperty(ts4sFileInfo, "srcFiles", inputFiles)
-
-    val dest: scala.collection.mutable.ListBuffer[File] = scala.collection.mutable.ListBuffer()
-    putProperty(ts4sFileInfo, "addDestFile", function({ (file) =>
-      dest += new File(file.toString)
-    }))
-    put(VarName.ts4sFileInfo, ts4sFileInfo, scope)
-    dest
-  }
-
-  private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable) {
+  private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable): Unit = {
     val libs = ScriptResources.defaultLibNames map { name =>
       val lib = cx.newObject(scope)
       putProperty(lib, "name", name)
@@ -107,7 +93,7 @@ private[typescript4s] object ScriptableObjectHelper {
     var syntaxTrees: Map[File, Future[Object]] = Map()
     var sourceUnits: Map[File, Future[Object]] = Map()
     putProperty(ts4sPrepareResource, "load", function({ files =>
-      val syntaxTrees = (files.asInstanceOf[NativeArray].toArray map (_.asInstanceOf[NativeObject]) map { f =>
+      syntaxTrees = (files.asInstanceOf[NativeArray].toArray map (_.asInstanceOf[NativeObject]) map { f =>
         val name = f.get("path").toString
         val file = new File(name)
         val syntaxTree = evalSyntaxTree(scope, name, FileUtils.readFileToString(file), Some(settings))
@@ -163,7 +149,6 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sUtil = "ts4sUtil"
     val ts4sHost = "ts4sHost"
     val ts4sSettings = "ts4sSettings"
-    val ts4sFileInfo = "ts4sFileInfo"
     val ts4sDefaultLibs = "ts4sDefaultLibs"
     val ts4sPrepareResource = "ts4sPrepareResource"
   }

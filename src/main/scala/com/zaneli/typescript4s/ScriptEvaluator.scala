@@ -1,13 +1,16 @@
 package com.zaneli.typescript4s
 
-import com.zaneli.typescript4s.ScriptableObjectHelper.{ addEnv, addHost, addDefaultLibInfo, addUtil }
-import org.mozilla.javascript.{ Context, ContextFactory, JavaScriptException, Scriptable, Undefined, WrappedException }
+import com.zaneli.typescript4s.ScriptableObjectHelper._
+import java.io.File
+import org.mozilla.javascript._
+import org.mozilla.javascript.ScriptableObject.putProperty
 import org.mozilla.javascript.tools.shell.Global
+import scala.collection.JavaConversions._
 import scala.concurrent.Future
 
 private[typescript4s] object ScriptEvaluator {
   private[this] lazy val contextFactory = new ContextFactory()
-  private[typescript4s] lazy val globalScope = init()
+  private[this] lazy val globalScope = init()
 
   private[this] def init(): Scriptable = withContext { cx =>
     cx.setOptimizationLevel(-1)
@@ -26,7 +29,7 @@ private[typescript4s] object ScriptEvaluator {
     scope
   }
 
-  private[typescript4s] def withContext[A](f: Context => A): A = try {
+  private[this] def withContext[A](f: Context => A): A = try {
     val cx = contextFactory.enterContext()
     f(cx)
   } catch {
@@ -34,6 +37,75 @@ private[typescript4s] object ScriptEvaluator {
     case e: JavaScriptException => throw new TypeScriptCompilerException(e.getMessage, cause = e)
   } finally {
     Context.exit()
+  }
+
+  private[typescript4s] def resolve(src: Seq[File], options: CompileOptions): (NativeObject, Seq[File]) = {
+    val Array(compiler, files) = withContext { cx =>
+      val executeScope = cx.newObject(globalScope)
+      val settings = addSettings(cx, executeScope, options)
+      addPrepareResource(cx, executeScope, settings)
+      putProperty(executeScope, "ts4sSrcFiles", cx.newArray(executeScope, src.map(_.getAbsolutePath.asInstanceOf[Object]).toArray))
+
+      cx.evaluateString(
+        executeScope,
+        """
+        TypeScript.Environment = ts4sEnv;
+        var logger = new TypeScript.NullLogger();
+        var compiler = new TypeScript.TypeScriptCompiler(logger, ts4sSettings);
+        ts4sDefaultLibs.forEach(function (lib) {
+          compiler.addFile(lib.name, lib.snapshot, TypeScript.ByteOrderMark.None, 0, false, []);
+        });
+        var result = TypeScript.ReferenceResolver.resolve(ts4sSrcFiles, ts4sHost);
+        result.diagnostics.forEach(function (d) {
+          if (d.info().category === TypeScript.DiagnosticCategory.Error) {
+            throw d.message();
+          }
+        });
+
+        ts4sPrepareResource.load(result.resolvedFiles);
+        compiler.ts4sPrepareResource = ts4sPrepareResource;
+
+        [compiler, result.resolvedFiles.map(function (f) { return f.path; })]
+        """,
+        "resolve.js",
+        1,
+        null)
+    }.asInstanceOf[NativeArray].toArray
+    (compiler.asInstanceOf[NativeObject], files.asInstanceOf[NativeArray].toArray.map(f => new File(f.toString)))
+  }
+
+  private[typescript4s] def compile(compiler: NativeObject, files: Seq[File]): Seq[File] = {
+    withContext { cx =>
+      val executeScope = cx.newObject(globalScope)
+      putProperty(executeScope, "compiler", compiler)
+      putProperty(executeScope, "files", cx.newArray(executeScope, files.map(_.toString.asInstanceOf[Object]).toArray))
+      val destFiles = cx.evaluateString(
+        executeScope,
+        """
+        files.forEach(function (file) {
+          compiler.addFile(file, ts4sHost.getScriptSnapshot(file), TypeScript.ByteOrderMark.None, 0, false, []);
+        });
+
+        var destFiles = [];
+        for (var it = compiler.compile(function (path) { return path; }); it.moveNext();) {
+          var result = it.current();
+          result.diagnostics.forEach(function (d) {
+            if (d.info().category === TypeScript.DiagnosticCategory.Error) {
+              throw d.message();
+            }
+          });
+          result.outputFiles.forEach(function (f) {
+            TypeScript.Environment.writeFile(f.name, f.text, TypeScript.ByteOrderMark.None);
+            destFiles.push(f.name);
+          });
+        }
+        destFiles
+        """,
+        "compile.js",
+        1,
+        null)
+      destFiles.asInstanceOf[NativeArray].toArray.map(d => new File(d.toString))
+    }.toList
   }
 
   private[typescript4s] def evalScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
