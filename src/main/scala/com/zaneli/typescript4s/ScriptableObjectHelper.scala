@@ -43,6 +43,18 @@ private[typescript4s] object ScriptableObjectHelper {
   private[typescript4s] def addUtil(
     cx: Context, scope: Scriptable, syntaxTree: Map[String, Future[Object]], sourceUnit: Map[String, Future[Object]]): Unit = {
     val ts4sUtil = cx.newObject(scope)
+
+    putProperty(ts4sUtil, "sameSymbol", function({ (obj1, obj2) =>
+      (obj1, obj2) match {
+        case (symbol1: NativeObject, symbol2: NativeObject) => {
+          symbol1.get("pullSymbolID") == symbol2.get("pullSymbolID") &&
+          symbol1.get("name") == symbol2.get("name") &&
+          symbol1.get("kind") == symbol2.get("kind")
+        }
+        case _ => false
+      }
+    }))
+
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
       ScriptResources.defaultLibNames.contains(fileName)
     }))
@@ -52,6 +64,19 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
       sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
+
+    var documents: Map[String, Object] = Map()
+    putProperty(ts4sUtil, "setDocuments", function({ ds =>
+      if (documents.isEmpty) {
+        documents = ds.asInstanceOf[NativeArray].toArray.map { d =>
+          (d.asInstanceOf[NativeObject].get("fileName").toString -> d)
+        }.toMap
+      }
+    }))
+    putProperty(ts4sUtil, "getDocument", function({ fileName =>
+      documents.get(fileName.toString).getOrElse(Undefined.instance)
+    }))
+
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
 

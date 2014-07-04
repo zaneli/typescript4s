@@ -27684,7 +27684,17 @@ var TypeScript;
 
         Document.prototype.topLevelDecl = function () {
             if (this._topLevelDecl === null) {
-                this._topLevelDecl = TypeScript.DeclarationCreator.create(this, this._semanticInfoChain, this._compiler.compilationSettings());
+                var cache = ts4sUtil.getDocument(this.fileName);
+                if (cache) {
+                    this._topLevelDecl = cache._topLevelDecl;
+                    this._astDeclMap = cache._astDeclMap;
+                    this._declASTMap = cache._declASTMap;
+                    this._diagnostics = cache._diagnostics;
+                    this._lineMap = cache._lineMap;
+                    this._amdDependencies = cache._amdDependencies;
+                } else {
+                    this._topLevelDecl = TypeScript.DeclarationCreator.create(this, this._semanticInfoChain, this._compiler.compilationSettings());
+                }
             }
 
             return this._topLevelDecl;
@@ -40412,7 +40422,8 @@ var TypeScript;
         };
 
         PullTypeResolver.prototype.isAnyOrEquivalent = function (type) {
-            return (type === this.semanticInfoChain.anyTypeSymbol) || type.isError();
+            // return (type === this.semanticInfoChain.anyTypeSymbol) || type.isError();
+            return (ts4sUtil.sameSymbol(type, this.semanticInfoChain.anyTypeSymbol)) || type.isError();
         };
 
         PullTypeResolver.prototype.resolveExternalModuleReference = function (idText, currentFileName) {
@@ -43762,7 +43773,8 @@ var TypeScript;
         };
 
         PullTypeResolver.prototype.isAnyOrNumberOrEnum = function (type) {
-            return this.isAnyOrEquivalent(type) || type === this.semanticInfoChain.numberTypeSymbol || TypeScript.PullHelpers.symbolIsEnum(type);
+            // return this.isAnyOrEquivalent(type) || type === this.semanticInfoChain.numberTypeSymbol || TypeScript.PullHelpers.symbolIsEnum(type);
+            return this.isAnyOrEquivalent(type) || ts4sUtil.sameSymbol(type, this.semanticInfoChain.numberTypeSymbol) || TypeScript.PullHelpers.symbolIsEnum(type);
         };
 
         PullTypeResolver.prototype.typeCheckUnaryArithmeticOperation = function (unaryExpression, context) {
@@ -48163,6 +48175,10 @@ var TypeScript;
                 return true;
             }
 
+            if (ts4sUtil.sameSymbol(source, target)) {
+                return true;
+            }
+
             if (source && target) {
                 if (context.oneOfClassificationsIsInfinitelyExpanding()) {
                     return this.infinitelyExpandingSourceTypeIsRelatableToTargetType(source, target, assignableTo, comparisonCache, ast, context, comparisonInfo, isComparingInstantiatedSignatures);
@@ -48198,6 +48214,10 @@ var TypeScript;
             target = this.getSymbolForRelationshipCheck(target);
 
             if (source === target) {
+                return true;
+            }
+
+            if (ts4sUtil.sameSymbol(source, target)) {
                 return true;
             }
 

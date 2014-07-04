@@ -99,6 +99,11 @@ private[typescript4s] object ScriptEvaluator {
             destFiles.push(f.name);
           });
         }
+
+        ts4sUtil.setDocuments(ts4sDefaultLibs.map(function (lib) {
+            return compiler.getDocument(lib.name);
+        }));
+
         destFiles
         """,
         "compile.js",
