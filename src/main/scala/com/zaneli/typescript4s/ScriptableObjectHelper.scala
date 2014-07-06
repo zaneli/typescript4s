@@ -1,6 +1,7 @@
 package com.zaneli.typescript4s
 
 import com.zaneli.typescript4s.ScriptEvaluator.{ evalScriptSnapshot, evalSourceUnit, evalSyntaxTree }
+import com.zaneli.typescript4s.cache.FileInformationCache
 import java.io.File
 import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.{ BaseFunction, Context, NativeArray, NativeObject, Scriptable, Undefined }
@@ -48,8 +49,8 @@ private[typescript4s] object ScriptableObjectHelper {
       (obj1, obj2) match {
         case (symbol1: NativeObject, symbol2: NativeObject) => {
           symbol1.get("pullSymbolID") == symbol2.get("pullSymbolID") &&
-          symbol1.get("name") == symbol2.get("name") &&
-          symbol1.get("kind") == symbol2.get("kind")
+            symbol1.get("name") == symbol2.get("name") &&
+            symbol1.get("kind") == symbol2.get("kind")
         }
         case _ => false
       }
@@ -75,6 +76,13 @@ private[typescript4s] object ScriptableObjectHelper {
     }))
     putProperty(ts4sUtil, "getDocument", function({ fileName =>
       documents.get(fileName.toString).getOrElse(Undefined.instance)
+    }))
+
+    putProperty(ts4sUtil, "getFileInformation", function({ normalizedPath =>
+      FileInformationCache.get(normalizedPath.toString).getOrElse(Undefined.instance)
+    }))
+    putProperty(ts4sUtil, "putFileInformation", function({ (normalizedPath, fileInfo) =>
+      FileInformationCache.put(normalizedPath.toString, fileInfo)
     }))
 
     put(VarName.ts4sUtil, ts4sUtil, scope)

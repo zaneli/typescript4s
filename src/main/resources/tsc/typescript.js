@@ -33514,7 +33514,13 @@ var TypeScript;
                 TypeScript.fileResolutionIOTime += totalTime;
 
                 var lineMap = TypeScript.LineMap1.fromScriptSnapshot(scriptSnapshot);
-                var preprocessedFileInformation = TypeScript.preProcessFile(normalizedPath, scriptSnapshot);
+
+                var preprocessedFileInformation = ts4sUtil.getFileInformation(normalizedPath);
+                if (!preprocessedFileInformation) {
+                    preprocessedFileInformation = TypeScript.preProcessFile(normalizedPath, scriptSnapshot);
+                    ts4sUtil.putFileInformation(normalizedPath, preprocessedFileInformation);
+                }
+
                 resolutionResult.diagnostics.push.apply(resolutionResult.diagnostics, preprocessedFileInformation.diagnostics);
 
                 if (preprocessedFileInformation.isLibFile) {

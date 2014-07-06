@@ -1,10 +1,10 @@
 package com.zaneli.typescript4s
 
 import akka.actor.{ ActorSystem, Cancellable }
+import com.zaneli.typescript4s.util.FilePathUtil
 import java.io.File
-import java.nio.file.FileSystems
-import org.slf4j.{ Logger, LoggerFactory }
 import java.nio.file.WatchService
+import org.slf4j.{ Logger, LoggerFactory }
 
 class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = CompileOptions()) {
   import TypeScriptCompiler.{ as, logger, sep }
@@ -54,10 +54,10 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
 
     def mkWatchServices(files: Seq[File]) = {
       wss = files.filter(_.isFile).groupBy(_.getParentFile.toPath).toSeq.map {
-        case (path, files) => {
-          val ws = path.getFileSystem.newWatchService()
-          val key = path.register(ws, ENTRY_MODIFY)
-          (ws, path, files)
+        case (dir, files) => {
+          val ws = dir.getFileSystem.newWatchService()
+          val key = dir.register(ws, ENTRY_MODIFY)
+          (ws, dir, files)
         }
       }
     }
@@ -69,11 +69,11 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
     as.scheduler.schedule(0 seconds, 1 seconds) {
       val wss = getWatchServices()
       val updateFiles = for (
-        (ws, path, files) <- wss;
+        (ws, dir, files) <- wss;
         key <- Option(ws.poll()).toSeq;
         event <- key.pollEvents.asScala if event.kind == ENTRY_MODIFY && event.context.isInstanceOf[Path];
         _ = key.reset();
-        file = path.resolve(event.context.asInstanceOf[Path]).toFile if files.contains(file)
+        file = FilePathUtil.toFile(dir, event) if files.contains(file)
       ) yield {
         file
       }
