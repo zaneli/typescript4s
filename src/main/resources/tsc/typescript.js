@@ -13,6 +13,12 @@ See the Apache Version 2.0 License for specific language governing permissions
 and limitations under the License.
 ***************************************************************************** */
 
+/*! *****************************************************************************
+State prominent notices for the Apache License, Version 2.0.
+
+This code was modified by Shunsuke Ohtani (@zaneli) for TypeScript4s.
+***************************************************************************** */
+
 var TypeScript;
 (function (TypeScript) {
     TypeScript.DiagnosticCode = {
