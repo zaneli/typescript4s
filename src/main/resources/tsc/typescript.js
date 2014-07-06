@@ -27538,10 +27538,7 @@ var TypeScript;
             if (!this._sourceUnit) {
                 var start = new Date().getTime();
                 var syntaxTree = this.syntaxTree();
-                this._sourceUnit = ts4sUtil.getDefaultLibSourceUnit(this.fileName);
-                if (!this._sourceUnit) {
-                    this._sourceUnit = this._compiler.ts4sPrepareResource.getSourceUnit(this.fileName);
-                }
+                this._sourceUnit = ts4sUtil.getSourceUnit(this.fileName);
                 if (!this._sourceUnit) {
                     this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
                 }
@@ -27600,10 +27597,7 @@ var TypeScript;
             if (!result) {
                 var start = new Date().getTime();
 
-                result = ts4sUtil.getDefaultLibSyntaxTree(this.fileName);
-                if (!result) {
-                    result = this._compiler.ts4sPrepareResource.getSyntaxTree(this.fileName);
-                }
+                result = ts4sUtil.getSyntaxTree(this.fileName);
                 if (!result) {
                     result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
                 }

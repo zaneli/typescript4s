@@ -43,8 +43,7 @@ private[typescript4s] object ScriptEvaluator {
     val Array(compiler, files) = withContext { cx =>
       val executeScope = cx.newObject(globalScope)
       val settings = addSettings(cx, executeScope, options)
-      addPrepareResource(cx, executeScope, settings)
-      putProperty(executeScope, "ts4sSrcFiles", cx.newArray(executeScope, src.map(_.getAbsolutePath.asInstanceOf[Object]).toArray))
+      putProperty(executeScope, "ts4sSrcFiles", cx.newArray(executeScope, src.map(_.getCanonicalPath.asInstanceOf[Object]).toArray))
 
       cx.evaluateString(
         executeScope,
@@ -61,9 +60,6 @@ private[typescript4s] object ScriptEvaluator {
             throw d.message();
           }
         });
-
-        ts4sPrepareResource.load(result.resolvedFiles);
-        compiler.ts4sPrepareResource = ts4sPrepareResource;
 
         [compiler, result.resolvedFiles.map(function (f) { return f.path; })]
         """,

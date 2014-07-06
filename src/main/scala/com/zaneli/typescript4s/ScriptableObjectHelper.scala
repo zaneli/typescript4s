@@ -26,13 +26,13 @@ private[typescript4s] object ScriptableObjectHelper {
       new File(fileName.toString).exists()
     }))
     putProperty(ts4sHost, "getParentDirectory", function({ fileName =>
-      new File(fileName.toString).getParentFile.getAbsolutePath
+      new File(fileName.toString).getParentFile.getCanonicalPath
     }))
     putProperty(ts4sHost, "resolveRelativePath", function({ (fileName, parentFileDirectory) =>
       if (new File(fileName.toString).isAbsolute) {
-        new File(fileName.toString).getAbsolutePath
+        new File(fileName.toString).getCanonicalPath
       } else {
-        new File(parentFileDirectory.toString, fileName.toString).getAbsolutePath
+        new File(parentFileDirectory.toString, fileName.toString).getCanonicalPath
       }
     }))
     putProperty(ts4sHost, "getScriptSnapshot", function({ fileName =>
@@ -59,11 +59,19 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
       ScriptResources.defaultLibNames.contains(fileName)
     }))
-    putProperty(ts4sUtil, "getDefaultLibSyntaxTree", function({ fileName =>
-      syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
+    putProperty(ts4sUtil, "getSyntaxTree", function({ fileName =>
+      (if (ScriptResources.defaultLibNames.contains(fileName)) {
+        syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf))
+      } else {
+        FileInformationCache.getSyntaxTree(fileName.toString)
+      }).getOrElse(Undefined.instance)
     }))
-    putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
-      sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
+    putProperty(ts4sUtil, "getSourceUnit", function({ fileName =>
+      (if (ScriptResources.defaultLibNames.contains(fileName)) {
+        sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf))
+      } else {
+        FileInformationCache.getSourceUnit(fileName.toString)
+      }).getOrElse(Undefined.instance)
     }))
 
     var documents: Map[String, Object] = Map()
@@ -79,10 +87,10 @@ private[typescript4s] object ScriptableObjectHelper {
     }))
 
     putProperty(ts4sUtil, "getFileInformation", function({ normalizedPath =>
-      FileInformationCache.get(normalizedPath.toString).getOrElse(Undefined.instance)
+      FileInformationCache.getFileInfo(normalizedPath.toString).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "putFileInformation", function({ (normalizedPath, fileInfo) =>
-      FileInformationCache.put(normalizedPath.toString, fileInfo)
+      FileInformationCache.put(normalizedPath.toString, fileInfo, scope)
     }))
 
     put(VarName.ts4sUtil, ts4sUtil, scope)
@@ -92,10 +100,10 @@ private[typescript4s] object ScriptableObjectHelper {
     val mutableSettings = cx.evaluateString(
       scope, "new TypeScript.CompilationSettings()", "", 1, null).asInstanceOf[NativeObject]
     putProperty(mutableSettings, "removeComments", options.removeComments)
-    putProperty(mutableSettings, "outFileOption", options.outOpt.map(_.getAbsolutePath).getOrElse(""))
-    putProperty(mutableSettings, "outDirOption", options.outDirOpt.map(_.getAbsolutePath).getOrElse(""))
-    putProperty(mutableSettings, "mapRoot", options.mapRootOpt.map(_.getAbsolutePath).getOrElse(""))
-    putProperty(mutableSettings, "sourceRoot", options.sourceRootOpt.map(_.getAbsolutePath).getOrElse(""))
+    putProperty(mutableSettings, "outFileOption", options.outOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(mutableSettings, "outDirOption", options.outDirOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(mutableSettings, "mapRoot", options.mapRootOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(mutableSettings, "sourceRoot", options.sourceRootOpt.map(_.getCanonicalPath).getOrElse(""))
     putProperty(mutableSettings, "codeGenTarget", options.target.code)
     putProperty(mutableSettings, "moduleGenTarget", options.module.code)
     putProperty(mutableSettings, "generateDeclarationFiles", options.declaration)
@@ -119,30 +127,6 @@ private[typescript4s] object ScriptableObjectHelper {
     }
     val ts4sDefaultLibs = cx.newArray(scope, libs.toArray)
     put(VarName.ts4sDefaultLibs, ts4sDefaultLibs, scope)
-  }
-
-  private[typescript4s] def addPrepareResource(cx: Context, scope: Scriptable, settings: Object): Unit = {
-    val ts4sPrepareResource = cx.newObject(scope)
-    var syntaxTrees: Map[File, Future[Object]] = Map()
-    var sourceUnits: Map[File, Future[Object]] = Map()
-    putProperty(ts4sPrepareResource, "load", function({ files =>
-      syntaxTrees = (files.asInstanceOf[NativeArray].toArray map (_.asInstanceOf[NativeObject]) map { f =>
-        val name = f.get("path").toString
-        val file = new File(name)
-        val syntaxTree = evalSyntaxTree(scope, name, FileUtils.readFileToString(file), Some(settings))
-        (file -> syntaxTree)
-      }).toMap
-      sourceUnits = (syntaxTrees map {
-        case (file, f) => (file -> evalSourceUnit(scope, f, Some(settings)))
-      }).toMap
-    }))
-    putProperty(ts4sPrepareResource, "getSyntaxTree", function({ file =>
-      syntaxTrees.get(new File(file.toString)).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
-    }))
-    putProperty(ts4sPrepareResource, "getSourceUnit", function({ file =>
-      sourceUnits.get(new File(file.toString)).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
-    }))
-    put(VarName.ts4sPrepareResource, ts4sPrepareResource, scope)
   }
 
   private[this] def put(name: String, obj: Any, scope: Scriptable) {
@@ -183,6 +167,5 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sHost = "ts4sHost"
     val ts4sSettings = "ts4sSettings"
     val ts4sDefaultLibs = "ts4sDefaultLibs"
-    val ts4sPrepareResource = "ts4sPrepareResource"
   }
 }
