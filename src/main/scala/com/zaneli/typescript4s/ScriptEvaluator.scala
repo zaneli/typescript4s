@@ -18,14 +18,14 @@ private[typescript4s] object ScriptEvaluator {
     val global = new Global()
     global.init(cx)
     val scope = cx.initStandardObjects(global)
-    cx.evaluateString(scope, ScriptResources.typescriptJs, "typescript.js", 1, null)
+    cx.evaluateString(scope, ScriptResources.typescriptJs, "typescript.js")
     addHost(cx, scope)
     addEnv(cx, scope)
     addDefaultLibInfo(cx, scope)
 
-    val syntaxTree = evalSyntaxTree(scope)
-    val sourceUnit = evalSourceUnit(scope, syntaxTree)
-    addUtil(cx, scope, syntaxTree, sourceUnit)
+    val syntaxTrees = evalSyntaxTrees(scope)
+    val sourceUnits = evalSourceUnits(scope, syntaxTrees)
+    addUtil(cx, scope, syntaxTrees, sourceUnits)
     scope
   }
 
@@ -44,7 +44,7 @@ private[typescript4s] object ScriptEvaluator {
       val executeScope = cx.newObject(globalScope)
       val settings = addSettings(cx, executeScope, options)
       addCache(cx, executeScope, options, settings)
-      putProperty(executeScope, "ts4sSrcFiles", cx.newArray(executeScope, src.map(_.getCanonicalPath.asInstanceOf[Object]).toArray))
+      putProperty(executeScope, "inputFileNames", cx.newArray(executeScope, src.map(_.getCanonicalPath.asInstanceOf[Object]).toArray))
 
       cx.evaluateString(
         executeScope,
@@ -55,7 +55,7 @@ private[typescript4s] object ScriptEvaluator {
         ts4sDefaultLibs.forEach(function (lib) {
           compiler.addFile(lib.name, lib.snapshot, TypeScript.ByteOrderMark.None, 0, false, []);
         });
-        var result = TypeScript.ReferenceResolver.resolve(ts4sSrcFiles, ts4sHost);
+        var result = TypeScript.ReferenceResolver.resolve(inputFileNames, ts4sHost);
         result.diagnostics.forEach(function (d) {
           if (d.info().category === TypeScript.DiagnosticCategory.Error) {
             throw d.message();
@@ -68,9 +68,7 @@ private[typescript4s] object ScriptEvaluator {
 
         [compiler, paths];
         """,
-        "resolve.js",
-        1,
-        null)
+        "resolve.js")
     }.asInstanceOf[NativeArray].toArray
     (compiler.asInstanceOf[NativeObject], files.asInstanceOf[NativeArray].toArray.map(f => new File(f.toString)))
   }
@@ -107,9 +105,7 @@ private[typescript4s] object ScriptEvaluator {
 
         destFiles
         """,
-        "compile.js",
-        1,
-        null)
+        "compile.js")
       destFiles.asInstanceOf[NativeArray].toArray.map(d => new File(d.toString))
     }.toList
   }
@@ -117,7 +113,7 @@ private[typescript4s] object ScriptEvaluator {
   private[typescript4s] def evalScriptSnapshot(cx: Context, scope: Scriptable, content: String): ScriptSnapshot = {
     val tmpScope = cx.newObject(scope)
     tmpScope.put(s"content", tmpScope, content)
-    cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js", 1, null)
+    cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js")
   }
 
   private[typescript4s] def evalSyntaxTree(
@@ -126,21 +122,19 @@ private[typescript4s] object ScriptEvaluator {
     Future {
       withContext { cx =>
         val tmpScope = cx.newObject(scope)
-        tmpScope.put("ts4sFilePath", tmpScope, name)
-        tmpScope.put("ts4sContent", tmpScope, content)
-        tmpScope.put("ts4sSettings", tmpScope, settings.getOrElse(Undefined.instance))
+        tmpScope.put("filePath", tmpScope, name)
+        tmpScope.put("content", tmpScope, content)
+        tmpScope.put("settings", tmpScope, settings.getOrElse(Undefined.instance))
         cx.evaluateString(
           tmpScope,
           """
           TypeScript.Parser.parse(
-            TypeScript.switchToForwardSlashes(ts4sFilePath),
-            TypeScript.SimpleText.fromString(ts4sContent),
-            TypeScript.isDTSFile(ts4sFilePath),
-            TypeScript.getParseOptions(ts4sSettings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
+            TypeScript.switchToForwardSlashes(filePath),
+            TypeScript.SimpleText.fromString(content),
+            TypeScript.isDTSFile(filePath),
+            TypeScript.getParseOptions(settings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
           """,
-          "syntaxTree.js",
-          1,
-          null)
+          "syntaxTree.js")
       }
     }
   }
@@ -151,32 +145,29 @@ private[typescript4s] object ScriptEvaluator {
     syntaxTree map { s =>
       withContext { cx =>
         val tmpScope = cx.newObject(scope)
-        tmpScope.put("ts4sSyntaxTree", tmpScope, s)
-        tmpScope.put("ts4sSettings", tmpScope, settings.getOrElse(Undefined.instance))
+        tmpScope.put("syntaxTree", tmpScope, s)
+        tmpScope.put("settings", tmpScope, settings.getOrElse(Undefined.instance))
         cx.evaluateString(
           tmpScope,
           """
-          ts4sSyntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
-            ts4sSyntaxTree.fileName(),
-            ts4sSyntaxTree.lineMap(),
-            ts4sSettings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
+          syntaxTree.sourceUnit().accept(new TypeScript.SyntaxTreeToAstVisitor(
+            syntaxTree.fileName(),
+            syntaxTree.lineMap(),
+            settings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
           """,
-          "sourceUnit.js",
-          1,
-          null)
+          "sourceUnit.js")
       }
     }
   }
 
-  private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Future[SyntaxTree]] = {
-    (ScriptResources.defaultLibNames.zipWithIndex map {
-      case (name, index) =>
-        val syntaxTree = evalSyntaxTree(scope, name, ScriptResources.defaultLibs(name))
-        (name -> syntaxTree)
+  private[this] def evalSyntaxTrees(scope: Scriptable): Map[String, Future[SyntaxTree]] = {
+    (ScriptResources.defaultLibNames map { name =>
+      val syntaxTree = evalSyntaxTree(scope, name, ScriptResources.defaultLibs(name))
+      (name -> syntaxTree)
     }).toMap
   }
 
-  private[this] def evalSourceUnit(scope: Scriptable, fs: Map[String, Future[SyntaxTree]]): Map[String, Future[SourceUnit]] = {
+  private[this] def evalSourceUnits(scope: Scriptable, fs: Map[String, Future[SyntaxTree]]): Map[String, Future[SourceUnit]] = {
     (ScriptResources.defaultLibNames map (name => (name -> evalSourceUnit(scope, fs(name))))).toMap
   }
 }

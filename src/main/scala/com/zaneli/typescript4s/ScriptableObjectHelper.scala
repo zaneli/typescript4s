@@ -42,7 +42,7 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def addUtil(
-    cx: Context, scope: Scriptable, syntaxTree: Map[String, Future[Object]], sourceUnit: Map[String, Future[Object]]): Unit = {
+    cx: Context, scope: Scriptable, syntaxTrees: Map[String, Future[SyntaxTree]], sourceUnits: Map[String, Future[SourceUnit]]): Unit = {
     val ts4sUtil = cx.newObject(scope)
 
     putProperty(ts4sUtil, "sameSymbol", function({ (obj1, obj2) =>
@@ -60,13 +60,13 @@ private[typescript4s] object ScriptableObjectHelper {
       ScriptResources.defaultLibNames.contains(fileName)
     }))
     putProperty(ts4sUtil, "getDefaultLibSyntaxTree", function({ fileName =>
-      syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
+      syntaxTrees.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
-      sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
+      sourceUnits.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
 
-    var documents: Map[String, Object] = Map()
+    var documents: Map[String, Document] = Map()
     putProperty(ts4sUtil, "setDocuments", function({ ds =>
       if (documents.isEmpty) {
         documents = ds.asInstanceOf[NativeArray].toArray.map { d =>
@@ -89,23 +89,23 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): ImmutableSettings = {
-    val mutableSettings = cx.evaluateString(
-      scope, "new TypeScript.CompilationSettings()", "", 1, null).asInstanceOf[NativeObject]
-    putProperty(mutableSettings, "removeComments", options.removeComments)
-    putProperty(mutableSettings, "outFileOption", options.outOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(mutableSettings, "outDirOption", options.outDirOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(mutableSettings, "mapRoot", options.mapRootOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(mutableSettings, "sourceRoot", options.sourceRootOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(mutableSettings, "codeGenTarget", options.target.code)
-    putProperty(mutableSettings, "moduleGenTarget", options.module.code)
-    putProperty(mutableSettings, "generateDeclarationFiles", options.declaration)
-    putProperty(mutableSettings, "mapSourceFiles", options.sourcemap)
-    putProperty(mutableSettings, "noImplicitAny", options.noImplicitAny)
+    val settings = cx.evaluateString(
+      scope, "new TypeScript.CompilationSettings()", "compilationSettings.js").asInstanceOf[NativeObject]
+    putProperty(settings, "removeComments", options.removeComments)
+    putProperty(settings, "outFileOption", options.outOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(settings, "outDirOption", options.outDirOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(settings, "mapRoot", options.mapRootOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(settings, "sourceRoot", options.sourceRootOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(settings, "codeGenTarget", options.target.code)
+    putProperty(settings, "moduleGenTarget", options.module.code)
+    putProperty(settings, "generateDeclarationFiles", options.declaration)
+    putProperty(settings, "mapSourceFiles", options.sourcemap)
+    putProperty(settings, "noImplicitAny", options.noImplicitAny)
 
     val tmpScope = cx.newObject(scope)
-    tmpScope.put("mutableSettings", tmpScope, mutableSettings)
+    tmpScope.put("settings", tmpScope, settings)
     val immutableSettings = cx.evaluateString(
-      tmpScope, "TypeScript.ImmutableCompilationSettings.fromCompilationSettings(mutableSettings)", "", 1, null)
+      tmpScope, "TypeScript.ImmutableCompilationSettings.fromCompilationSettings(settings)", "immutableCompilationSettings.js")
     put(VarName.ts4sSettings, immutableSettings, scope)
     immutableSettings
   }

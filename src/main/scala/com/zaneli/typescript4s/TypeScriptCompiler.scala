@@ -51,7 +51,7 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
     var wss: Seq[(WatchService, Path, Seq[File])] = Nil
 
     def mkWatchServices(files: Seq[File]) = {
-      wss = files.filter(_.isFile).groupBy(_.getParentFile.toPath).toSeq.map {
+      wss = files.filter(_.isFile).groupBy(_.getParentFile.toPath).toSeq map {
         case (dir, files) => {
           val ws = dir.getFileSystem.newWatchService()
           val key = dir.register(ws, ENTRY_MODIFY)
