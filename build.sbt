@@ -2,11 +2,11 @@ organization := "com.zaneli"
 
 name := "typescript4s"
 
-version := "0.1.0"
+version := "0.0.1"
 
-scalaVersion := "2.11.0"
+scalaVersion := "2.11.1"
 
-crossScalaVersions := Seq("2.10.4", "2.11.0")
+crossScalaVersions := Seq("2.10.4", "2.11.1")
 
 scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-deprecation", "-unchecked")
 
