@@ -1,9 +1,8 @@
 package com.zaneli.typescript4s
 
 import akka.actor.{ ActorSystem, Cancellable }
-import com.zaneli.typescript4s.util.FilePathUtil
+import com.zaneli.typescript4s.cache.FileInformationCache
 import java.io.File
-import java.nio.file.WatchService
 import org.slf4j.{ Logger, LoggerFactory }
 
 class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = CompileOptions()) {
@@ -44,7 +43,7 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
     import scala.concurrent.duration._
     import scala.language.postfixOps
     import scala.util.{ Failure, Success, Try }
-    import java.nio.file.Path
+    import java.nio.file.{ Path, WatchService }
     import java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
 
     val (compiler, files) = ScriptEvaluator.resolve(src, options)
@@ -66,15 +65,16 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
     }
     mkWatchServices(files)
 
-    as.scheduler.schedule(0 seconds, 1 seconds) {
+    as.scheduler.schedule(0 seconds, 500 milliseconds) {
       val wss = getWatchServices()
       val updateFiles = for (
         (ws, dir, files) <- wss;
         key <- Option(ws.poll()).toSeq;
         event <- key.pollEvents.asScala if event.kind == ENTRY_MODIFY && event.context.isInstanceOf[Path];
         _ = key.reset();
-        file = FilePathUtil.toFile(dir, event) if files.contains(file)
+        file = dir.resolve(event.context.asInstanceOf[Path]).toFile if files.contains(file)
       ) yield {
+        FileInformationCache.remove(file)
         file
       }
       if (updateFiles.nonEmpty) {
@@ -101,6 +101,10 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
 
 object TypeScriptCompiler {
   private val as = ActorSystem.create()
+  sys addShutdownHook {
+    as.shutdown()
+  }
+
   private val logger = LoggerFactory.getLogger(implicitly[scala.reflect.ClassTag[TypeScriptCompiler]].runtimeClass)
   private val sep = s"""${System.getProperty("line.separator")}    """
 

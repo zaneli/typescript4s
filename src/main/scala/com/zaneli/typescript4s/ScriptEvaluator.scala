@@ -109,14 +109,14 @@ private[typescript4s] object ScriptEvaluator {
     }.toList
   }
 
-  private[typescript4s] def evalScriptSnapshot(cx: Context, scope: Scriptable, content: String): Object = {
+  private[typescript4s] def evalScriptSnapshot(cx: Context, scope: Scriptable, content: String): ScriptSnapshot = {
     val tmpScope = cx.newObject(scope)
     tmpScope.put(s"content", tmpScope, content)
     cx.evaluateString(tmpScope, "TypeScript.ScriptSnapshot.fromString(content);", "scriptSnapshot.js", 1, null)
   }
 
   private[typescript4s] def evalSyntaxTree(
-    scope: Scriptable, name: String, content: String, settings: Option[Object] = None): Future[Object] = {
+    scope: Scriptable, name: String, content: String, settings: Option[ImmutableSettings] = None): Future[SyntaxTree] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     Future {
       withContext { cx =>
@@ -141,7 +141,7 @@ private[typescript4s] object ScriptEvaluator {
   }
 
   private[typescript4s] def evalSourceUnit(
-    scope: Scriptable, syntaxTree: Future[Object], settings: Option[Object] = None): Future[Object] = {
+    scope: Scriptable, syntaxTree: Future[SyntaxTree], settings: Option[ImmutableSettings] = None): Future[SourceUnit] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     syntaxTree map { s =>
       withContext { cx =>
@@ -163,7 +163,7 @@ private[typescript4s] object ScriptEvaluator {
     }
   }
 
-  private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Future[Object]] = {
+  private[this] def evalSyntaxTree(scope: Scriptable): Map[String, Future[SyntaxTree]] = {
     (ScriptResources.defaultLibNames.zipWithIndex map {
       case (name, index) =>
         val syntaxTree = evalSyntaxTree(scope, name, ScriptResources.defaultLibs(name))
@@ -171,7 +171,7 @@ private[typescript4s] object ScriptEvaluator {
     }).toMap
   }
 
-  private[this] def evalSourceUnit(scope: Scriptable, fs: Map[String, Future[Object]]): Map[String, Future[Object]] = {
+  private[this] def evalSourceUnit(scope: Scriptable, fs: Map[String, Future[SyntaxTree]]): Map[String, Future[SourceUnit]] = {
     (ScriptResources.defaultLibNames map (name => (name -> evalSourceUnit(scope, fs(name))))).toMap
   }
 }

@@ -63,14 +63,14 @@ private[typescript4s] object ScriptableObjectHelper {
       (if (ScriptResources.defaultLibNames.contains(fileName)) {
         syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf))
       } else {
-        FileInformationCache.getSyntaxTree(fileName.toString)
+        FileInformationCache.getSyntaxTree(new File(fileName.toString))
       }).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "getSourceUnit", function({ fileName =>
       (if (ScriptResources.defaultLibNames.contains(fileName)) {
         sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf))
       } else {
-        FileInformationCache.getSourceUnit(fileName.toString)
+        FileInformationCache.getSourceUnit(new File(fileName.toString))
       }).getOrElse(Undefined.instance)
     }))
 
@@ -87,16 +87,16 @@ private[typescript4s] object ScriptableObjectHelper {
     }))
 
     putProperty(ts4sUtil, "getFileInformation", function({ normalizedPath =>
-      FileInformationCache.getFileInfo(normalizedPath.toString).getOrElse(Undefined.instance)
+      FileInformationCache.getFileInfo(new File(normalizedPath.toString)).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "putFileInformation", function({ (normalizedPath, fileInfo) =>
-      FileInformationCache.put(normalizedPath.toString, fileInfo, scope)
+      FileInformationCache.put(new File(normalizedPath.toString), fileInfo, scope)
     }))
 
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
 
-  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): Object = {
+  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): ImmutableSettings = {
     val mutableSettings = cx.evaluateString(
       scope, "new TypeScript.CompilationSettings()", "", 1, null).asInstanceOf[NativeObject]
     putProperty(mutableSettings, "removeComments", options.removeComments)
