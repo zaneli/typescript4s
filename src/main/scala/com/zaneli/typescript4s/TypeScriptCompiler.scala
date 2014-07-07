@@ -1,7 +1,6 @@
 package com.zaneli.typescript4s
 
 import akka.actor.{ ActorSystem, Cancellable }
-import com.zaneli.typescript4s.cache.FileInformationCache
 import java.io.File
 import org.slf4j.{ Logger, LoggerFactory }
 
@@ -74,7 +73,6 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
         _ = key.reset();
         file = dir.resolve(event.context.asInstanceOf[Path]).toFile if files.contains(file)
       ) yield {
-        FileInformationCache.remove(file)
         file
       }
       if (updateFiles.nonEmpty) {

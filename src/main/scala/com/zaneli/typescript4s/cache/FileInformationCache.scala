@@ -1,5 +1,6 @@
 package com.zaneli.typescript4s.cache
 
+import com.zaneli.typescript4s.{ ECMAVersion, ImmutableSettings }
 import com.zaneli.typescript4s.{ PreprocessedFileInformation, SourceUnit, SyntaxTree }
 import com.zaneli.typescript4s.ScriptEvaluator.{ evalSourceUnit, evalSyntaxTree }
 import java.io.File
@@ -13,28 +14,40 @@ import scala.concurrent.duration.Duration
 
 private[typescript4s] object FileInformationCache {
 
-  // not use java.nio.file.WatchService because of occurring time rag
-  private[this] val cacheMap: ConcurrentMap[String, (PreprocessedFileInformation, Future[SyntaxTree], Future[SourceUnit], Long)] =
+  private[this] val fileInfoMap: ConcurrentMap[String, (PreprocessedFileInformation, Long)] = new ConcurrentHashMap().asScala
+  private[this] val parseResultMap: ConcurrentMap[(String, ECMAVersion), (Future[SyntaxTree], Future[SourceUnit])] =
     new ConcurrentHashMap().asScala
 
-  private[typescript4s] def put(
-    file: File, fileInfo: PreprocessedFileInformation, scope: Scriptable): Unit = this.synchronized {
+  private[typescript4s] def putFileInfo(
+    file: File, fileInfo: PreprocessedFileInformation): Unit = this.synchronized {
+    fileInfoMap.getOrElseUpdate(file.getCanonicalPath, (fileInfo, file.lastModified))
+  }
 
-    val filePath = file.getCanonicalPath
+  private[typescript4s] def parseAndCache(
+    files: Seq[File], version: ECMAVersion, settings: ImmutableSettings, scope: Scriptable): Unit = this.synchronized {
 
-    cacheMap.getOrElseUpdate(filePath, {
-      val syntaxTree = evalSyntaxTree(scope, filePath, FileUtils.readFileToString(file))
-      val sourceUnit = evalSourceUnit(scope, syntaxTree)
-
-      (fileInfo, syntaxTree, sourceUnit, file.lastModified)
-    })
+    files foreach { file =>
+      val filePath = file.getCanonicalPath
+      parseResultMap.getOrElseUpdate((filePath, version), {
+        val syntaxTree = evalSyntaxTree(scope, filePath, FileUtils.readFileToString(file), Some(settings))
+        val sourceUnit = evalSourceUnit(scope, syntaxTree, Some(settings))
+        (syntaxTree, sourceUnit)
+      })
+    }
   }
 
   private[typescript4s] def getFileInfo(file: File): Option[PreprocessedFileInformation] = this.synchronized {
-    cacheMap.get(file.getCanonicalPath) flatMap {
-      case (fileInfo, _, _, lastModified) =>
-        if (lastModified < file.lastModified) {
-          cacheMap.remove(file.getCanonicalPath)
+    val filePath = file.getCanonicalPath
+
+    fileInfoMap.get(filePath) flatMap {
+      case (fileInfo, lastModified) =>
+        if (lastModified < file.lastModified) { // not use java.nio.file.WatchService because of occurring time rag
+          fileInfoMap.remove(filePath)
+          parseResultMap withFilter {
+            case ((f, _), _) => f == filePath
+          } foreach {
+            case ((f, o), _) => parseResultMap.remove((f, o))
+          }
           None
         } else {
           Some(fileInfo)
@@ -42,15 +55,11 @@ private[typescript4s] object FileInformationCache {
     }
   }
 
-  private[typescript4s] def getSyntaxTree(file: File): Option[SyntaxTree] = {
-    cacheMap.get(file.getCanonicalPath) map (v => Await.result(v._2, Duration.Inf))
+  private[typescript4s] def getSyntaxTree(file: File, version: ECMAVersion): Option[SyntaxTree] = {
+    parseResultMap.get(file.getCanonicalPath, version) map { case (f, _) => Await.result(f, Duration.Inf) }
   }
 
-  private[typescript4s] def getSourceUnit(file: File): Option[SourceUnit] = {
-    cacheMap.get(file.getCanonicalPath) map (v => Await.result(v._3, Duration.Inf))
-  }
-
-  private[typescript4s] def remove(file: File): Unit = this.synchronized {
-    cacheMap.remove(file.getCanonicalPath)
+  private[typescript4s] def getSourceUnit(file: File, version: ECMAVersion): Option[SourceUnit] = {
+    parseResultMap.get(file.getCanonicalPath, version) map { case (_, f) => Await.result(f, Duration.Inf) }
   }
 }

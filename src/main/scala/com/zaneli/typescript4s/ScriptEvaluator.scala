@@ -43,6 +43,7 @@ private[typescript4s] object ScriptEvaluator {
     val Array(compiler, files) = withContext { cx =>
       val executeScope = cx.newObject(globalScope)
       val settings = addSettings(cx, executeScope, options)
+      addCache(cx, executeScope, options, settings)
       putProperty(executeScope, "ts4sSrcFiles", cx.newArray(executeScope, src.map(_.getCanonicalPath.asInstanceOf[Object]).toArray))
 
       cx.evaluateString(
@@ -61,7 +62,11 @@ private[typescript4s] object ScriptEvaluator {
           }
         });
 
-        [compiler, result.resolvedFiles.map(function (f) { return f.path; })]
+        var paths = result.resolvedFiles.map(function (f) { return f.path; });
+        ts4sCache.parse(paths);
+        compiler.ts4sCache = ts4sCache;
+
+        [compiler, paths];
         """,
         "resolve.js",
         1,

@@ -31,4 +31,10 @@ sealed abstract class ECMAVersion(val code: Int, val name: String)
 object ECMAVersion {
   case object ES3 extends ECMAVersion(0, "ES3") // EcmaScript3
   case object ES5 extends ECMAVersion(1, "ES5") // EcmaScript5
+
+  def apply(code: Int): ECMAVersion = code match {
+    case ES3.code => ES3
+    case ES5.code => ES5
+    case _ => throw new IllegalArgumentException(s"Invalid ECMAVersion (${code}).")
+  }
 }

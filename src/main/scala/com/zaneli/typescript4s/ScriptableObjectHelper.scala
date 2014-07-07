@@ -59,19 +59,11 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
       ScriptResources.defaultLibNames.contains(fileName)
     }))
-    putProperty(ts4sUtil, "getSyntaxTree", function({ fileName =>
-      (if (ScriptResources.defaultLibNames.contains(fileName)) {
-        syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf))
-      } else {
-        FileInformationCache.getSyntaxTree(new File(fileName.toString))
-      }).getOrElse(Undefined.instance)
+    putProperty(ts4sUtil, "getDefaultLibSyntaxTree", function({ fileName =>
+      syntaxTree.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
-    putProperty(ts4sUtil, "getSourceUnit", function({ fileName =>
-      (if (ScriptResources.defaultLibNames.contains(fileName)) {
-        sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf))
-      } else {
-        FileInformationCache.getSourceUnit(new File(fileName.toString))
-      }).getOrElse(Undefined.instance)
+    putProperty(ts4sUtil, "getDefaultLibSourceUnit", function({ fileName =>
+      sourceUnit.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
 
     var documents: Map[String, Object] = Map()
@@ -90,7 +82,7 @@ private[typescript4s] object ScriptableObjectHelper {
       FileInformationCache.getFileInfo(new File(normalizedPath.toString)).getOrElse(Undefined.instance)
     }))
     putProperty(ts4sUtil, "putFileInformation", function({ (normalizedPath, fileInfo) =>
-      FileInformationCache.put(new File(normalizedPath.toString), fileInfo, scope)
+      FileInformationCache.putFileInfo(new File(normalizedPath.toString), fileInfo)
     }))
 
     put(VarName.ts4sUtil, ts4sUtil, scope)
@@ -127,6 +119,23 @@ private[typescript4s] object ScriptableObjectHelper {
     }
     val ts4sDefaultLibs = cx.newArray(scope, libs.toArray)
     put(VarName.ts4sDefaultLibs, ts4sDefaultLibs, scope)
+  }
+
+  private[typescript4s] def addCache(cx: Context, scope: Scriptable, options: CompileOptions, settings: ImmutableSettings): Unit = {
+    val ts4sCache = cx.newObject(scope)
+
+    putProperty(ts4sCache, "parse", function({ fileNames =>
+      val files = fileNames.asInstanceOf[NativeArray].toArray.map(f => new File(f.toString)).toSeq
+      FileInformationCache.parseAndCache(files, options.target, settings, scope)
+    }))
+    putProperty(ts4sCache, "getSyntaxTree", function({ fileName =>
+      FileInformationCache.getSyntaxTree(new File(fileName.toString), options.target).getOrElse(Undefined.instance)
+    }))
+    putProperty(ts4sCache, "getSourceUnit", function({ fileName =>
+      FileInformationCache.getSourceUnit(new File(fileName.toString), options.target).getOrElse(Undefined.instance)
+    }))
+
+    put(VarName.ts4sCache, ts4sCache, scope)
   }
 
   private[this] def put(name: String, obj: Any, scope: Scriptable) {
@@ -167,5 +176,6 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sHost = "ts4sHost"
     val ts4sSettings = "ts4sSettings"
     val ts4sDefaultLibs = "ts4sDefaultLibs"
+    val ts4sCache = "ts4sCache"
   }
 }

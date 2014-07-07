@@ -19,7 +19,7 @@ class TypeScriptCompilerSpec extends Specification {
       val actualDests = TypeScriptCompiler(src).compile()
       actualDests must have size 1
       val actualDest = actualDests(0)
-      actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
+      actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
       getContents(actualDest) must_== getContents("/js/standalone.js")
     }
 
@@ -32,7 +32,7 @@ class TypeScriptCompilerSpec extends Specification {
       val actualDests = TypeScriptCompiler(src).compile()
       actualDests must have size 1
       val actualDest = actualDests(0)
-      actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
+      actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
       getContents(actualDest) must_== getContents("/js/refer-jquery.js")
     }
 
@@ -45,7 +45,7 @@ class TypeScriptCompilerSpec extends Specification {
       val actualDests = TypeScriptCompiler(src).compile()
       actualDests must have size 1
       val actualDest = actualDests(0)
-      actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
+      actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
       getContents(actualDest) must_== getContents("/js/refer-jquery.tile.js")
     }
 
@@ -68,7 +68,7 @@ class TypeScriptCompilerSpec extends Specification {
         val actualDests = TypeScriptCompiler(src).removeComments(true).compile()
         actualDests must have size 1
         val actualDest = actualDests(0)
-        actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
         getContents(actualDest) must_== getContents("/js/remove-comments.js")
       }
       "out" in new context {
@@ -81,7 +81,7 @@ class TypeScriptCompilerSpec extends Specification {
         val actualDests = TypeScriptCompiler(src).out(expectedDest).compile()
         actualDests must have size 1
         val actualDest = actualDests(0)
-        actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
         getContents(actualDest) must_== getContents("/js/standalone.js")
       }
       "outdir" in new context {
@@ -94,7 +94,7 @@ class TypeScriptCompilerSpec extends Specification {
         val actualDests = TypeScriptCompiler(src).outDir(expectedDest.getParentFile).compile()
         actualDests must have size 1
         val actualDest = actualDests(0)
-        actualDest.getAbsolutePath must_== expectedDest.getAbsolutePath
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
         getContents(actualDest) must_== getContents("/js/standalone.js")
       }
       "declaration" in new context {
@@ -108,7 +108,7 @@ class TypeScriptCompilerSpec extends Specification {
 
         val actualDests = TypeScriptCompiler(src).declaration(true).compile()
         actualDests must have size 2
-        actualDests.map(_.getAbsolutePath) must contain(expectedDestJs.getAbsolutePath, expectedDestDts.getAbsolutePath)
+        actualDests.map(_.getCanonicalPath) must contain(expectedDestJs.getCanonicalPath, expectedDestDts.getCanonicalPath)
         actualDests.map(getContents) must contain(getContents("/js/with-declaration.js"), getContents("/ts/typings/with-declaration.d.ts"))
       }
       "sourcemap" in new context {
@@ -122,8 +122,63 @@ class TypeScriptCompilerSpec extends Specification {
 
         val actualDests = TypeScriptCompiler(src).sourcemap(true).compile()
         actualDests must have size 2
-        actualDests.map(_.getAbsolutePath) must contain(expectedDestJs.getAbsolutePath, expectedDestMap.getAbsolutePath)
+        actualDests.map(_.getCanonicalPath) must contain(expectedDestJs.getCanonicalPath, expectedDestMap.getCanonicalPath)
         actualDests.map(getContents) must contain(getContents("/js/sourcemap.js"), getContents("/sourcemap/sourcemap.js.map"))
+      }
+      "target" in new context {
+        val src = getPath("/ts/get-set.ts")
+        val expectedDest = getDestJsPath(src)
+        destFiles += expectedDest
+        expectedDest.exists must beFalse
+
+        val compiler = TypeScriptCompiler(src)
+        compiler.compile() must throwA[TypeScriptCompilerException]
+        expectedDest.exists must beFalse
+
+        compiler.target(ECMAVersion.ES3).compile() must throwA[TypeScriptCompilerException]
+        expectedDest.exists must beFalse
+
+        val actualDests = compiler.target(ECMAVersion.ES5).compile()
+        actualDests must have size 1
+        val actualDest = actualDests(0)
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
+        getContents(actualDest) must_== getContents("/js/get-set.js")
+      }
+      "module" in new context {
+        val src = getPath("/ts/import.ts")
+        val expectedDestImport = getDestJsPath(src)
+        destFiles += expectedDestImport
+        expectedDestImport.exists must beFalse
+        val expectedDestModule = getDestJsPath(getPath("/ts/module.ts"))
+        destFiles += expectedDestModule
+        expectedDestModule.exists must beFalse
+
+        val compiler = TypeScriptCompiler(src)
+        val actualDestsCommonJS = compiler.module(ModuleKind.CommonJS).compile()
+        actualDestsCommonJS must have size 2
+        actualDestsCommonJS.map(_.getCanonicalPath) must contain(expectedDestImport.getCanonicalPath, expectedDestModule.getCanonicalPath)
+        actualDestsCommonJS.map(getContents) must contain(getContents("/js/import-commonjs.js"), getContents("/js/module-commonjs.js"))
+
+        val actualDestsAMD = compiler.module(ModuleKind.AMD).compile()
+        actualDestsAMD must have size 2
+        actualDestsAMD.map(_.getCanonicalPath) must contain(expectedDestImport.getCanonicalPath, expectedDestModule.getCanonicalPath)
+        actualDestsAMD.map(getContents) must contain(getContents("/js/import-amd.js"), getContents("/js/module-amd.js"))
+      }
+      "noImplicitAny" in new context {
+        val src = getPath("/ts/implicit-any.ts")
+        val expectedDest = getDestJsPath(src)
+        destFiles += expectedDest
+        expectedDest.exists must beFalse
+
+        val compiler = TypeScriptCompiler(src)
+        compiler.noImplicitAny(true).compile() must throwA[TypeScriptCompilerException]
+        expectedDest.exists must beFalse
+
+        val actualDests = compiler.noImplicitAny(false).compile()
+        actualDests must have size 1
+        val actualDest = actualDests(0)
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
+        getContents(actualDest) must_== getContents("/js/implicit-any.js")
       }
     }
   }

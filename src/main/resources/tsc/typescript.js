@@ -27544,7 +27544,10 @@ var TypeScript;
             if (!this._sourceUnit) {
                 var start = new Date().getTime();
                 var syntaxTree = this.syntaxTree();
-                this._sourceUnit = ts4sUtil.getSourceUnit(this.fileName);
+                this._sourceUnit = this._compiler.ts4sCache.getSourceUnit(this.fileName);
+                if (!this._sourceUnit) {
+                    this._sourceUnit = ts4sUtil.getDefaultLibSourceUnit(this.fileName);
+                }
                 if (!this._sourceUnit) {
                     this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
                 }
@@ -27603,7 +27606,10 @@ var TypeScript;
             if (!result) {
                 var start = new Date().getTime();
 
-                result = ts4sUtil.getSyntaxTree(this.fileName);
+                result = this._compiler.ts4sCache.getSyntaxTree(this.fileName);
+                if (!result) {
+                    result = ts4sUtil.getDefaultLibSyntaxTree(this.fileName);
+                }
                 if (!result) {
                     result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
                 }
@@ -44544,7 +44550,8 @@ var TypeScript;
 
             var symbol = this.getSymbolForAST(ast, context);
             if (symbol && symbol.isResolved) {
-                this.typeCheckAST(ast, isContextuallyTyped, context);
+                var f = this.typeCheckAST.bind(this);
+                sync(f)(ast, isContextuallyTyped, context);
                 return symbol;
             }
 
