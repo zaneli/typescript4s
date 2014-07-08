@@ -23,9 +23,8 @@ private[typescript4s] object ScriptEvaluator {
     addEnv(cx, scope)
     addDefaultLibInfo(cx, scope)
 
-    val syntaxTrees = evalSyntaxTrees(scope)
-    val sourceUnits = evalSourceUnits(scope, syntaxTrees)
-    addUtil(cx, scope, syntaxTrees, sourceUnits)
+    val documents = evalDocuments(cx, scope, evalSourceUnits(scope, evalSyntaxTrees(scope)))
+    addUtil(cx, scope, documents)
     scope
   }
 
@@ -53,7 +52,8 @@ private[typescript4s] object ScriptEvaluator {
         var logger = new TypeScript.NullLogger();
         var compiler = new TypeScript.TypeScriptCompiler(logger, ts4sSettings);
         ts4sDefaultLibs.forEach(function (lib) {
-          compiler.addFile(lib.name, lib.snapshot, TypeScript.ByteOrderMark.None, 0, false, []);
+          TypeScript.sourceCharactersCompiled += lib.snapshot.getLength();
+          compiler.semanticInfoChain.addDocument(ts4sUtil.getDocument(lib.name));
         });
         var result = TypeScript.ReferenceResolver.resolve(inputFileNames, ts4sHost);
         result.diagnostics.forEach(function (d) {
@@ -98,11 +98,6 @@ private[typescript4s] object ScriptEvaluator {
             destFiles.push(f.name);
           });
         }
-
-        ts4sUtil.setDocuments(ts4sDefaultLibs.map(function (lib) {
-            return compiler.getDocument(lib.name);
-        }));
-
         destFiles
         """,
         "compile.js")
@@ -134,7 +129,7 @@ private[typescript4s] object ScriptEvaluator {
             TypeScript.isDTSFile(filePath),
             TypeScript.getParseOptions(settings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
           """,
-          "syntaxTree.js")
+          "evalSyntaxTree.js")
       }
     }
   }
@@ -155,11 +150,10 @@ private[typescript4s] object ScriptEvaluator {
             syntaxTree.lineMap(),
             settings || TypeScript.ImmutableCompilationSettings.defaultSettings()));
           """,
-          "sourceUnit.js")
+          "evalSourceUnit.js")
       }
     }
   }
-
   private[this] def evalSyntaxTrees(scope: Scriptable): Map[String, Future[SyntaxTree]] = {
     (ScriptResources.defaultLibNames map { name =>
       val syntaxTree = evalSyntaxTree(scope, name, ScriptResources.defaultLibs(name))
@@ -167,7 +161,51 @@ private[typescript4s] object ScriptEvaluator {
     }).toMap
   }
 
-  private[this] def evalSourceUnits(scope: Scriptable, fs: Map[String, Future[SyntaxTree]]): Map[String, Future[SourceUnit]] = {
-    (ScriptResources.defaultLibNames map (name => (name -> evalSourceUnit(scope, fs(name))))).toMap
+  private[this] def evalSourceUnits(scope: Scriptable, fs: Map[String, Future[SyntaxTree]]): Map[String, Future[(SyntaxTree, SourceUnit)]] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    (ScriptResources.defaultLibNames map { name =>
+      val stf = fs(name)
+      val suf = evalSourceUnit(scope, stf)
+      (name -> stf.flatMap(st => suf map (su => (st, su))))
+    }).toMap
+  }
+
+  private[this] def evalDocuments(cx: Context, scope: Scriptable, fs: Map[String, Future[(SyntaxTree, SourceUnit)]]): Map[String, Future[Document]] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    val compiler = cx.evaluateString(
+      scope,
+      """
+      TypeScript.Environment = ts4sEnv;
+      var logger = new TypeScript.NullLogger();
+      var compiler = new TypeScript.TypeScriptCompiler(logger, TypeScript.ImmutableCompilationSettings.defaultSettings());
+      ts4sDefaultLibs.forEach(function (lib) {
+        compiler.addFile(lib.name, lib.snapshot, TypeScript.ByteOrderMark.None, 0, false, []);
+      });
+      compiler
+      """,
+      "")
+    (ScriptResources.defaultLibNames map { name =>
+      val document = fs(name).map {
+        case (syntaxTree, sourceUnit) =>
+          withContext { cx =>
+            val tmpScope = cx.newObject(scope)
+            tmpScope.put("compiler", tmpScope, compiler)
+            tmpScope.put("fileName", tmpScope, name)
+            tmpScope.put("syntaxTree", tmpScope, syntaxTree)
+            tmpScope.put("sourceUnit", tmpScope, sourceUnit)
+            cx.evaluateString(
+              tmpScope,
+              """
+              var d = compiler.getDocument(fileName);
+              d._syntaxTree = syntaxTree;
+              d._sourceUnit = sourceUnit;
+              d._topLevelDecl = TypeScript.DeclarationCreator.create(d, d._semanticInfoChain, compiler.compilationSettings());
+              d;
+              """,
+              "evalDocument.js")
+          }
+      }
+      (name -> document)
+    }).toMap
   }
 }

@@ -27546,9 +27546,6 @@ var TypeScript;
                 var syntaxTree = this.syntaxTree();
                 this._sourceUnit = this._compiler.ts4sCache.getSourceUnit(this.fileName);
                 if (!this._sourceUnit) {
-                    this._sourceUnit = ts4sUtil.getDefaultLibSourceUnit(this.fileName);
-                }
-                if (!this._sourceUnit) {
                     this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
                 }
                 TypeScript.astTranslationTime += new Date().getTime() - start;
@@ -27607,9 +27604,6 @@ var TypeScript;
                 var start = new Date().getTime();
 
                 result = this._compiler.ts4sCache.getSyntaxTree(this.fileName);
-                if (!result) {
-                    result = ts4sUtil.getDefaultLibSyntaxTree(this.fileName);
-                }
                 if (!result) {
                     result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
                 }
@@ -27690,17 +27684,7 @@ var TypeScript;
 
         Document.prototype.topLevelDecl = function () {
             if (this._topLevelDecl === null) {
-                var cache = ts4sUtil.getDocument(this.fileName);
-                if (cache) {
-                    this._topLevelDecl = cache._topLevelDecl;
-                    this._astDeclMap = cache._astDeclMap;
-                    this._declASTMap = cache._declASTMap;
-                    this._diagnostics = cache._diagnostics;
-                    this._lineMap = cache._lineMap;
-                    this._amdDependencies = cache._amdDependencies;
-                } else {
-                    this._topLevelDecl = TypeScript.DeclarationCreator.create(this, this._semanticInfoChain, this._compiler.compilationSettings());
-                }
+                this._topLevelDecl = TypeScript.DeclarationCreator.create(this, this._semanticInfoChain, this._compiler.compilationSettings());
             }
 
             return this._topLevelDecl;
