@@ -1,11 +1,11 @@
 package com.zaneli.typescript4s
 
-import akka.actor.{ ActorSystem, Cancellable }
+import akka.actor.Cancellable
 import java.io.File
 import org.slf4j.{ Logger, LoggerFactory }
 
 class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = CompileOptions()) {
-  import TypeScriptCompiler.{ as, logger, sep }
+  import TypeScriptCompiler.{ logger, sep }
 
   def out(file: File): TypeScriptCompiler =
     new TypeScriptCompiler(src, options.copy(out = file))
@@ -30,8 +30,8 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
 
   def compile(): Seq[File] = ScriptEvaluator.synchronized {
     val start = System.nanoTime
-    val (compiler, files) = ScriptEvaluator.resolve(src, options)
-    val dest = ScriptEvaluator.compile(compiler, files)
+    val (compiler, _) = ScriptEvaluator.resolve(src, options)
+    val dest = ScriptEvaluator.compile(compiler)
     logger.debug(s"""Done. (${(System.nanoTime - start) / 1000000} ms)""")
     dest
   }
@@ -46,7 +46,7 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
     import java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
 
     val (compiler, files) = ScriptEvaluator.resolve(src, options)
-    ScriptEvaluator.compile(compiler, files)
+    ScriptEvaluator.compile(compiler)
 
     var wss: Seq[(WatchService, Path, Seq[File])] = Nil
 
@@ -81,7 +81,7 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
         logger.debug(s"""Recompiling (${files.mkString(sep, sep, "")}):""")
         Try {
           val (compiler, files) = ScriptEvaluator.resolve(src, options)
-          val dest = ScriptEvaluator.compile(compiler, files)
+          val dest = ScriptEvaluator.compile(compiler)
           (files, dest)
         } match {
           case Success((newFiles, dest)) => {
@@ -98,11 +98,6 @@ class TypeScriptCompiler private (src: Seq[File], options: CompileOptions = Comp
 }
 
 object TypeScriptCompiler {
-  private val as = ActorSystem.create()
-  sys addShutdownHook {
-    as.shutdown()
-  }
-
   private val logger = LoggerFactory.getLogger(implicitly[scala.reflect.ClassTag[TypeScriptCompiler]].runtimeClass)
   private val sep = s"""${System.getProperty("line.separator")}    """
 

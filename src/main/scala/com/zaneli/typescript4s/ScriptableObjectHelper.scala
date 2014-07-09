@@ -1,6 +1,6 @@
 package com.zaneli.typescript4s
 
-import com.zaneli.typescript4s.ScriptEvaluator.{ evalScriptSnapshot, evalSourceUnit, evalSyntaxTree }
+import com.zaneli.typescript4s.ScriptEvaluator.evalScriptSnapshot
 import com.zaneli.typescript4s.cache.FileInformationCache
 import java.io.File
 import org.apache.commons.io.FileUtils
@@ -55,14 +55,15 @@ private[typescript4s] object ScriptableObjectHelper {
         case _ => false
       }
     }))
-
+    putProperty(ts4sUtil, "awaitResult", function({ future =>
+      Await.result(future.asInstanceOf[Future[_]], Duration.Inf)
+    }))
     putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
       ScriptResources.defaultLibNames.contains(fileName)
     }))
     putProperty(ts4sUtil, "getDocument", function({ fileName =>
       documents.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
     }))
-
     putProperty(ts4sUtil, "getFileInformation", function({ normalizedPath =>
       FileInformationCache.getFileInfo(new File(normalizedPath.toString)).getOrElse(Undefined.instance)
     }))
@@ -73,7 +74,7 @@ private[typescript4s] object ScriptableObjectHelper {
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
 
-  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): ImmutableSettings = {
+  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): Unit = {
     val settings = cx.evaluateString(
       scope, "new TypeScript.CompilationSettings()", "compilationSettings.js").asInstanceOf[NativeObject]
     putProperty(settings, "removeComments", options.removeComments)
@@ -92,7 +93,6 @@ private[typescript4s] object ScriptableObjectHelper {
     val immutableSettings = cx.evaluateString(
       tmpScope, "TypeScript.ImmutableCompilationSettings.fromCompilationSettings(settings)", "immutableCompilationSettings.js")
     put(VarName.ts4sSettings, immutableSettings, scope)
-    immutableSettings
   }
 
   private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable): Unit = {
@@ -106,18 +106,16 @@ private[typescript4s] object ScriptableObjectHelper {
     put(VarName.ts4sDefaultLibs, ts4sDefaultLibs, scope)
   }
 
-  private[typescript4s] def addCache(cx: Context, scope: Scriptable, options: CompileOptions, settings: ImmutableSettings): Unit = {
+  private[typescript4s] def addCache(cx: Context, scope: Scriptable, options: CompileOptions): Unit = {
     val ts4sCache = cx.newObject(scope)
 
     putProperty(ts4sCache, "parse", function({ fileNames =>
       val files = fileNames.asInstanceOf[NativeArray].toArray.map(f => new File(f.toString)).toSeq
-      FileInformationCache.parseAndCache(files, options.target, settings, scope)
+      FileInformationCache.parseAndCache(files, options.target, scope)
     }))
-    putProperty(ts4sCache, "getSyntaxTree", function({ fileName =>
-      FileInformationCache.getSyntaxTree(new File(fileName.toString), options.target).getOrElse(Undefined.instance)
-    }))
-    putProperty(ts4sCache, "getSourceUnit", function({ fileName =>
-      FileInformationCache.getSourceUnit(new File(fileName.toString), options.target).getOrElse(Undefined.instance)
+    putProperty(ts4sCache, "getDocument", function({ fileName =>
+      val file = new File(fileName.toString)
+      FileInformationCache.getDocument(file, options.target).getOrElse(Undefined.instance)
     }))
 
     put(VarName.ts4sCache, ts4sCache, scope)

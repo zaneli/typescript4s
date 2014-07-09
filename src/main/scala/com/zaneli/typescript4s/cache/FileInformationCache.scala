@@ -1,21 +1,23 @@
 package com.zaneli.typescript4s.cache
 
-import com.zaneli.typescript4s.{ ECMAVersion, ImmutableSettings }
-import com.zaneli.typescript4s.{ PreprocessedFileInformation, SourceUnit, SyntaxTree }
-import com.zaneli.typescript4s.ScriptEvaluator.{ evalSourceUnit, evalSyntaxTree }
+import akka.actor.Props
+import akka.pattern.ask
+import com.zaneli.typescript4s.{ as, timeout, ECMAVersion }
+import com.zaneli.typescript4s.{ Document, PreprocessedFileInformation }
+import com.zaneli.typescript4s.ScriptEvaluator.DocumentActor
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.Scriptable
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.{ Map => ConcurrentMap }
 import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
 private[typescript4s] object FileInformationCache {
 
   private[this] val fileInfoMap: ConcurrentMap[String, (PreprocessedFileInformation, Long)] = new ConcurrentHashMap().asScala
-  private[this] val parseResultMap: ConcurrentMap[(String, ECMAVersion), (Future[SyntaxTree], Future[SourceUnit])] =
+  private[this] val parseResultMap: ConcurrentMap[(String, ECMAVersion), (Future[Document])] =
     new ConcurrentHashMap().asScala
 
   private[typescript4s] def putFileInfo(
@@ -23,15 +25,13 @@ private[typescript4s] object FileInformationCache {
     fileInfoMap.getOrElseUpdate(file.getCanonicalPath, (fileInfo, file.lastModified))
   }
 
-  private[typescript4s] def parseAndCache(
-    files: Seq[File], version: ECMAVersion, settings: ImmutableSettings, scope: Scriptable): Unit = this.synchronized {
+  private[typescript4s] def parseAndCache(files: Seq[File], version: ECMAVersion, scope: Scriptable): Unit = this.synchronized {
 
     files foreach { file =>
       val filePath = file.getCanonicalPath
       parseResultMap.getOrElseUpdate((filePath, version), {
-        val syntaxTree = evalSyntaxTree(scope, filePath, FileUtils.readFileToString(file), Some(settings))
-        val sourceUnit = evalSourceUnit(scope, syntaxTree, Some(settings))
-        (syntaxTree, sourceUnit)
+        val da = as.actorOf(Props(classOf[DocumentActor]))
+        (da ? (scope, filePath)).map(_.asInstanceOf[Document])
       })
     }
   }
@@ -55,11 +55,7 @@ private[typescript4s] object FileInformationCache {
     }
   }
 
-  private[typescript4s] def getSyntaxTree(file: File, version: ECMAVersion): Option[SyntaxTree] = {
-    parseResultMap.get(file.getCanonicalPath, version) map { case (f, _) => Await.result(f, Duration.Inf) }
-  }
-
-  private[typescript4s] def getSourceUnit(file: File, version: ECMAVersion): Option[SourceUnit] = {
-    parseResultMap.get(file.getCanonicalPath, version) map { case (_, f) => Await.result(f, Duration.Inf) }
+  private[typescript4s] def getDocument(file: File, version: ECMAVersion): Option[Document] = {
+    parseResultMap.get(file.getCanonicalPath, version) map (Await.result(_, Duration.Inf))
   }
 }

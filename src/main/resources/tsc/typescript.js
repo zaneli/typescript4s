@@ -27544,10 +27544,7 @@ var TypeScript;
             if (!this._sourceUnit) {
                 var start = new Date().getTime();
                 var syntaxTree = this.syntaxTree();
-                this._sourceUnit = this._compiler.ts4sCache.getSourceUnit(this.fileName);
-                if (!this._sourceUnit) {
-                    this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
-                }
+                this._sourceUnit = TypeScript.SyntaxTreeToAstVisitor.visit(syntaxTree, this.fileName, this._compiler.compilationSettings(), this.isOpen);
                 TypeScript.astTranslationTime += new Date().getTime() - start;
 
                 if (!this.isOpen) {
@@ -27603,10 +27600,7 @@ var TypeScript;
             if (!result) {
                 var start = new Date().getTime();
 
-                result = this._compiler.ts4sCache.getSyntaxTree(this.fileName);
-                if (!result) {
-                    result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
-                }
+                result = TypeScript.Parser.parse(this.fileName, TypeScript.SimpleText.fromScriptSnapshot(this._scriptSnapshot), TypeScript.isDTSFile(this.fileName), TypeScript.getParseOptions(this._compiler.compilationSettings()));
 
                 TypeScript.syntaxTreeParseTime += new Date().getTime() - start;
 
