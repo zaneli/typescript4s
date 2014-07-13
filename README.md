@@ -38,3 +38,31 @@ scala> watcher.cancel
 ## Credit
 * typescript4s include typescript.js and lib.d.ts from TypeScript licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)  
 * typescript4s consulted [typescript4j](https://github.com/martypitt/typescript4j)
+
+##Maven Repository
+
+for Scala 2.10.x and Scala 2.11.x
+
+###pom.xml
+    <repositories>
+      <repository>
+        <id>com.zaneli</id>
+        <name>Zaneli Repository</name>
+        <url>http://www.zaneli.com/repositories</url>
+      </repository>
+    </repositories>
+
+    <dependencies>
+      <dependency>
+        <groupId>com.zaneli</groupId>
+        <artifactId>typescript4s_2.11</artifactId>
+        <version>0.0.1</version>
+      </dependency>
+    </dependencies>
+
+###build.sbt
+    resolvers += "Zaneli Repository" at "http://www.zaneli.com/repositories"
+
+    libraryDependencies ++= {
+      Seq("com.zaneli" %% "typescript4s" % "0.0.1")
+    }
