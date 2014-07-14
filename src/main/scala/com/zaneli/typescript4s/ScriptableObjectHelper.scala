@@ -87,6 +87,7 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(settings, "generateDeclarationFiles", options.declaration)
     putProperty(settings, "mapSourceFiles", options.sourcemap)
     putProperty(settings, "noImplicitAny", options.noImplicitAny)
+    putProperty(settings, "noLib", options.nolib)
 
     val tmpScope = cx.newObject(scope)
     tmpScope.put("settings", tmpScope, settings)

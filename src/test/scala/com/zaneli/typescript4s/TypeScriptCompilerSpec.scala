@@ -58,6 +58,28 @@ class TypeScriptCompilerSpec extends Specification {
       TypeScriptCompiler(src).compile() must throwA[TypeScriptCompilerException]
     }
 
+    "reference no-default-lib=true" in new context {
+      {
+        val src = getPath("/ts/refer-no-lib-d-ts.ts")
+        val expectedDest = getDestJsPath(src)
+        destFiles += expectedDest
+        expectedDest.exists must beFalse
+        TypeScriptCompiler(src).compile() must throwA[TypeScriptCompilerException]
+      }
+      {
+        val src = getPath("/ts/refer-lib-d-ts.ts")
+        val expectedDest = getDestJsPath(src)
+        destFiles += expectedDest
+        expectedDest.exists must beFalse
+
+        val actualDests = TypeScriptCompiler(src).compile()
+        actualDests must have size 1
+        val actualDest = actualDests(0)
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
+        getContents(actualDest) must_== getContents("/js/refer-lib-d-ts.js")
+      }
+    }
+
     "option" in {
       "removeComments" in new context {
         val src = getPath("/ts/remove-comments.ts")
@@ -179,6 +201,22 @@ class TypeScriptCompilerSpec extends Specification {
         val actualDest = actualDests(0)
         actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
         getContents(actualDest) must_== getContents("/js/implicit-any.js")
+      }
+      "nolib" in new context {
+        val src = getPath("/ts/refer-lib-d-ts.ts")
+        val expectedDest = getDestJsPath(src)
+        destFiles += expectedDest
+        expectedDest.exists must beFalse
+
+        val compiler = TypeScriptCompiler(src)
+        compiler.nolib(true).compile() must throwA[TypeScriptCompilerException]
+        expectedDest.exists must beFalse
+
+        val actualDests = compiler.nolib(false).compile()
+        actualDests must have size 1
+        val actualDest = actualDests(0)
+        actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
+        getContents(actualDest) must_== getContents("/js/refer-lib-d-ts.js")
       }
     }
   }

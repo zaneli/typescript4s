@@ -12,7 +12,8 @@ case class CompileOptions(
   removeComments: Boolean = false,
   noImplicitAny: Boolean = false,
   declaration: Boolean = false,
-  sourcemap: Boolean = false) {
+  sourcemap: Boolean = false,
+  nolib: Boolean = false) {
 
   val outOpt = Option(out)
   val outDirOpt = Option(outDir)

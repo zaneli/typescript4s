@@ -54,19 +54,22 @@ private[typescript4s] object ScriptEvaluator {
         TypeScript.Environment = ts4sEnv;
         var logger = new TypeScript.NullLogger();
         var compiler = new TypeScript.TypeScriptCompiler(logger, ts4sSettings);
-        ts4sDefaultLibs.forEach(function (lib) {
-          TypeScript.sourceCharactersCompiled += lib.snapshot.getLength();
-          var d = ts4sUtil.getDocument(lib.name);
-          d._compiler = compiler;
-          d._semanticInfoChain = compiler.semanticInfoChain;
-          compiler.semanticInfoChain.addDocument(d);
-        });
         var result = TypeScript.ReferenceResolver.resolve(inputFileNames, ts4sHost);
         result.diagnostics.forEach(function (d) {
           if (d.info().category === TypeScript.DiagnosticCategory.Error) {
             throw d.message();
           }
         });
+
+        if (!ts4sSettings.noLib() && !result.seenNoDefaultLibTag) {
+          ts4sDefaultLibs.forEach(function (lib) {
+            TypeScript.sourceCharactersCompiled += lib.snapshot.getLength();
+            var d = ts4sUtil.getDocument(lib.name);
+            d._compiler = compiler;
+            d._semanticInfoChain = compiler.semanticInfoChain;
+            compiler.semanticInfoChain.addDocument(d);
+          });
+        }
 
         result.resolvedFiles.forEach(function (f) {
           compiler.addFile(f.path, ts4sHost.getScriptSnapshot(f.path), TypeScript.ByteOrderMark.None, 0, false, f.referencedFiles);
