@@ -2,11 +2,8 @@ package com.zaneli.typescript4s
 
 import java.io.File
 import org.apache.commons.io.FileUtils
-import org.junit.runner.RunWith
 import org.specs2.mutable.{ After, Specification }
-import org.specs2.runner.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class TypeScriptCompilerSpec extends Specification {
 
   "TypeScriptCompiler#compile" should {
