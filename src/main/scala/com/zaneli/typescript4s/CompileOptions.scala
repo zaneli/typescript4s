@@ -12,8 +12,9 @@ case class CompileOptions(
   removeComments: Boolean = false,
   noImplicitAny: Boolean = false,
   declaration: Boolean = false,
-  sourcemap: Boolean = false,
-  nolib: Boolean = false) {
+  sourceMap: Boolean = false,
+  noLib: Boolean = false,
+  noEmitOnError: Boolean = false) {
 
   val outOpt = Option(out)
   val outDirOpt = Option(outDir)
@@ -32,10 +33,12 @@ sealed abstract class ECMAVersion(val code: Int, val name: String)
 object ECMAVersion {
   case object ES3 extends ECMAVersion(0, "ES3") // EcmaScript3
   case object ES5 extends ECMAVersion(1, "ES5") // EcmaScript5
+  case object ES6 extends ECMAVersion(2, "ES6") // EcmaScript6
 
   def apply(code: Int): ECMAVersion = code match {
     case ES3.code => ES3
     case ES5.code => ES5
+    case ES6.code => ES6
     case _ => throw new IllegalArgumentException(s"Invalid ECMAVersion (${code}).")
   }
 }

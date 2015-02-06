@@ -130,7 +130,7 @@ class TypeScriptCompilerSpec extends Specification {
         actualDests.map(_.getCanonicalPath) must contain(expectedDestJs.getCanonicalPath, expectedDestDts.getCanonicalPath)
         actualDests.map(getContents) must contain(getContents("/js/with-declaration.js"), getContents("/ts/typings/with-declaration.d.ts"))
       }
-      "sourcemap" in new context {
+      "sourceMap" in new context {
         val src = getPath("/ts/sourcemap.ts")
         val expectedDestJs = getDestJsPath(src)
         val expectedDestMap = new File(expectedDestJs.getParent, "sourcemap.js.map")
@@ -139,7 +139,7 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDestJs.exists must beFalse
         expectedDestMap.exists must beFalse
 
-        val actualDests = TypeScriptCompiler(src).sourcemap(true).compile()
+        val actualDests = TypeScriptCompiler(src).sourceMap(true).compile()
         actualDests must have size 2
         actualDests.map(_.getCanonicalPath) must contain(expectedDestJs.getCanonicalPath, expectedDestMap.getCanonicalPath)
         actualDests.map(getContents) must contain(getContents("/js/sourcemap.js"), getContents("/sourcemap/sourcemap.js.map"))
@@ -190,26 +190,26 @@ class TypeScriptCompilerSpec extends Specification {
         expectedDest.exists must beFalse
 
         val compiler = TypeScriptCompiler(src)
-        compiler.noImplicitAny(true).compile() must throwA[TypeScriptCompilerException]
+        compiler.noImplicitAny(true).noEmitOnError(true).compile() must throwA[TypeScriptCompilerException]
         expectedDest.exists must beFalse
 
-        val actualDests = compiler.noImplicitAny(false).compile()
+        val actualDests = compiler.noImplicitAny(false).noEmitOnError(true).compile()
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath
         getContents(actualDest) must_== getContents("/js/implicit-any.js")
       }
-      "nolib" in new context {
+      "noLib" in new context {
         val src = getPath("/ts/refer-lib-d-ts.ts")
         val expectedDest = getDestJsPath(src)
         destFiles += expectedDest
         expectedDest.exists must beFalse
 
         val compiler = TypeScriptCompiler(src)
-        compiler.nolib(true).compile() must throwA[TypeScriptCompilerException]
+        compiler.noLib(true).noEmitOnError(true).compile() must throwA[TypeScriptCompilerException]
         expectedDest.exists must beFalse
 
-        val actualDests = compiler.nolib(false).compile()
+        val actualDests = compiler.noLib(false).noEmitOnError(true).compile()
         actualDests must have size 1
         val actualDest = actualDests(0)
         actualDest.getCanonicalPath must_== expectedDest.getCanonicalPath

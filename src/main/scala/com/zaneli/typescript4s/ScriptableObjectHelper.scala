@@ -1,125 +1,72 @@
 package com.zaneli.typescript4s
 
-import com.zaneli.typescript4s.ScriptEvaluator.evalScriptSnapshot
-import com.zaneli.typescript4s.cache.FileInformationCache
 import java.io.File
 import org.apache.commons.io.FileUtils
-import org.mozilla.javascript.{ BaseFunction, Context, NativeArray, NativeObject, Scriptable, Undefined }
+import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration.Duration
 
 private[typescript4s] object ScriptableObjectHelper {
 
-  private[typescript4s] def addEnv(cx: Context, scope: Scriptable): Unit = {
-    val ts4sEnv = cx.newObject(scope)
-    putProperty(ts4sEnv, "newLine", System.getProperty("line.separator"))
-    putProperty(ts4sEnv, "writeFile", function({ (path, contents, writeByteOrderMark) =>
-      FileUtils.writeStringToFile(new File(path.toString), contents.toString)
-    }))
-    put(VarName.ts4sEnv, ts4sEnv, scope)
-  }
-
-  private[typescript4s] def addHost(cx: Context, scope: Scriptable): Unit = {
+  private[typescript4s] def setHost(
+    cx: Context,
+    scope: Scriptable,
+    outputFiles: scala.collection.mutable.ListBuffer[File]): Unit = {
     val ts4sHost = cx.newObject(scope)
-    putProperty(ts4sHost, "fileExists", function({ fileName =>
-      new File(fileName.toString).exists()
-    }))
-    putProperty(ts4sHost, "getParentDirectory", function({ fileName =>
-      new File(fileName.toString).getParentFile.getCanonicalPath
-    }))
-    putProperty(ts4sHost, "resolveRelativePath", function({ (fileName, parentFileDirectory) =>
-      if (new File(fileName.toString).isAbsolute) {
-        new File(fileName.toString).getCanonicalPath
+
+    putProperty(ts4sHost, "getDefaultLibFilename", function({ options =>
+      val target = options.asInstanceOf[NativeObject].get("target").asInstanceOf[Integer]
+      if (target == ECMAVersion.ES6.code) {
+        ScriptResources.libES6DTs.name
       } else {
-        new File(parentFileDirectory.toString, fileName.toString).getCanonicalPath
+        ScriptResources.libDTs.name
       }
     }))
-    putProperty(ts4sHost, "getScriptSnapshot", function({ fileName =>
-      evalScriptSnapshot(cx, scope, FileUtils.readFileToString(new File(fileName.toString)))
+    putProperty(ts4sHost, "getCanonicalFileName", function({ fileName =>
+      new File(fileName.toString).getCanonicalPath
     }))
+    putProperty(ts4sHost, "getNewLine", function({ () =>
+      System.getProperty("line.separator")
+    }))
+    putProperty(ts4sHost, "writeFile", function({ (fileName, data, writeByteOrderMark, onError) =>
+      val file = new File(fileName.toString)
+      outputFiles += file
+      FileUtils.writeStringToFile(file, data.toString)
+    }))
+    putProperty(ts4sHost, "getCurrentDirectory", function({ () =>
+      new File("").getCanonicalPath
+    }))
+    putProperty(ts4sHost, "getSourceFile", function({ (filename, languageVersion, onError) =>
+      val text = filename.toString match {
+        case ScriptResources.libDTs.name => ScriptResources.libDTs.content
+        case ScriptResources.libES6DTs.name => ScriptResources.libES6DTs.content
+        case name => FileUtils.readFileToString(new File(name))
+      }
+      scope.put("filename", scope, filename)
+      scope.put("text", scope, text)
+      scope.put("languageVersion", scope, languageVersion)
+      cx.evaluateString(scope, """ts.createSourceFile(filename, text, languageVersion, "0")""", "createSourceFile.js")
+    }))
+
     put(VarName.ts4sHost, ts4sHost, scope)
   }
 
-  private[typescript4s] def addUtil(cx: Context, scope: Scriptable, documents: Map[String, Future[Document]]): Unit = {
+  private[typescript4s] def setCompilerOptions(cx: Context, scope: Scriptable, options: CompileOptions): Unit = {
+    val compileOptions = cx.newObject(scope)
 
-    val ts4sUtil = cx.newObject(scope)
+    putProperty(compileOptions, "removeComments", options.removeComments)
+    putProperty(compileOptions, "out", options.outOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(compileOptions, "outDir", options.outDirOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(compileOptions, "mapRoot", options.mapRootOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(compileOptions, "sourceRoot", options.sourceRootOpt.map(_.getCanonicalPath).getOrElse(""))
+    putProperty(compileOptions, "target", options.target.code)
+    putProperty(compileOptions, "module", options.module.code)
+    putProperty(compileOptions, "declaration", options.declaration)
+    putProperty(compileOptions, "sourceMap", options.sourceMap)
+    putProperty(compileOptions, "noImplicitAny", options.noImplicitAny)
+    putProperty(compileOptions, "noLib", options.noLib)
+    putProperty(compileOptions, "noEmitOnError", options.noEmitOnError)
 
-    putProperty(ts4sUtil, "sameSymbol", function({ (obj1, obj2) =>
-      (obj1, obj2) match {
-        case (symbol1: NativeObject, symbol2: NativeObject) => {
-          symbol1.get("pullSymbolID") == symbol2.get("pullSymbolID") &&
-            symbol1.get("name") == symbol2.get("name") &&
-            symbol1.get("kind") == symbol2.get("kind")
-        }
-        case _ => false
-      }
-    }))
-    putProperty(ts4sUtil, "awaitResult", function({ future =>
-      Await.result(future.asInstanceOf[Future[_]], Duration.Inf)
-    }))
-    putProperty(ts4sUtil, "isDefaultLib", function({ fileName =>
-      ScriptResources.defaultLibNames.contains(fileName)
-    }))
-    putProperty(ts4sUtil, "getDocument", function({ fileName =>
-      documents.get(fileName.toString).map(Await.result(_, Duration.Inf)).getOrElse(Undefined.instance)
-    }))
-    putProperty(ts4sUtil, "getFileInformation", function({ normalizedPath =>
-      FileInformationCache.getFileInfo(new File(normalizedPath.toString)).getOrElse(Undefined.instance)
-    }))
-    putProperty(ts4sUtil, "putFileInformation", function({ (normalizedPath, fileInfo) =>
-      FileInformationCache.putFileInfo(new File(normalizedPath.toString), fileInfo)
-    }))
-
-    put(VarName.ts4sUtil, ts4sUtil, scope)
-  }
-
-  private[typescript4s] def addSettings(cx: Context, scope: Scriptable, options: CompileOptions): Unit = {
-    val settings = cx.evaluateString(
-      scope, "new TypeScript.CompilationSettings()", "compilationSettings.js").asInstanceOf[NativeObject]
-    putProperty(settings, "removeComments", options.removeComments)
-    putProperty(settings, "outFileOption", options.outOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(settings, "outDirOption", options.outDirOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(settings, "mapRoot", options.mapRootOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(settings, "sourceRoot", options.sourceRootOpt.map(_.getCanonicalPath).getOrElse(""))
-    putProperty(settings, "codeGenTarget", options.target.code)
-    putProperty(settings, "moduleGenTarget", options.module.code)
-    putProperty(settings, "generateDeclarationFiles", options.declaration)
-    putProperty(settings, "mapSourceFiles", options.sourcemap)
-    putProperty(settings, "noImplicitAny", options.noImplicitAny)
-    putProperty(settings, "noLib", options.nolib)
-
-    val tmpScope = cx.newObject(scope)
-    tmpScope.put("settings", tmpScope, settings)
-    val immutableSettings = cx.evaluateString(
-      tmpScope, "TypeScript.ImmutableCompilationSettings.fromCompilationSettings(settings)", "immutableCompilationSettings.js")
-    put(VarName.ts4sSettings, immutableSettings, scope)
-  }
-
-  private[typescript4s] def addDefaultLibInfo(cx: Context, scope: Scriptable): Unit = {
-    val libs = ScriptResources.defaultLibNames map { name =>
-      val lib = cx.newObject(scope)
-      putProperty(lib, "name", name)
-      putProperty(lib, "snapshot", evalScriptSnapshot(cx, scope, ScriptResources.defaultLibs(name)))
-      lib.asInstanceOf[Object]
-    }
-    val ts4sDefaultLibs = cx.newArray(scope, libs.toArray)
-    put(VarName.ts4sDefaultLibs, ts4sDefaultLibs, scope)
-  }
-
-  private[typescript4s] def addCache(cx: Context, scope: Scriptable, options: CompileOptions): Unit = {
-    val ts4sCache = cx.newObject(scope)
-
-    putProperty(ts4sCache, "parse", function({ fileNames =>
-      val files = fileNames.asInstanceOf[NativeArray].toArray.map(f => new File(f.toString)).toSeq
-      FileInformationCache.parseAndCache(files, options.target, scope)
-    }))
-    putProperty(ts4sCache, "getDocument", function({ fileName =>
-      val file = new File(fileName.toString)
-      FileInformationCache.getDocument(file, options.target).getOrElse(Undefined.instance)
-    }))
-
-    put(VarName.ts4sCache, ts4sCache, scope)
+    put(VarName.ts4sCompileOptions, compileOptions, scope)
   }
 
   private[this] def put(name: String, obj: Any, scope: Scriptable) {
@@ -142,6 +89,10 @@ private[typescript4s] object ScriptableObjectHelper {
     function({ args => f(args(0), args(1), args(2)) }, 3)
   }
 
+  private[this] def function(f: (Object, Object, Object, Object) => Any): BaseFunction = {
+    function({ args => f(args(0), args(1), args(2), args(3)) }, 4)
+  }
+
   private[this] def function(f: (Array[Object]) => Any, arity: Int): BaseFunction = new BaseFunction() {
     override def call(cx: Context, scope: Scriptable, s: Scriptable, args: Array[Object]): Object = {
       f(args) match {
@@ -155,11 +106,7 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[this] object VarName {
-    val ts4sEnv = "ts4sEnv"
-    val ts4sUtil = "ts4sUtil"
     val ts4sHost = "ts4sHost"
-    val ts4sSettings = "ts4sSettings"
-    val ts4sDefaultLibs = "ts4sDefaultLibs"
-    val ts4sCache = "ts4sCache"
+    val ts4sCompileOptions = "ts4sCompileOptions"
   }
 }
