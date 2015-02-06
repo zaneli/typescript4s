@@ -9,8 +9,6 @@ var Greeter = (function () {
     };
     return Greeter;
 })();
-
 // comment
 var greeter = new Greeter("TypeScript");
-
 $("div").html(greeter.greet());

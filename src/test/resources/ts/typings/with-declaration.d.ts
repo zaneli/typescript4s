@@ -1,7 +1,7 @@
 declare class Greeter {
-    public greeting: string;
+    greeting: string;
     constructor(message: string);
-    public greet(): string;
+    greet(): string;
 }
 declare var greeter: Greeter;
 declare var button: HTMLButtonElement;
