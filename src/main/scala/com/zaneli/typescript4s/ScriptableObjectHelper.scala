@@ -1,18 +1,26 @@
 package com.zaneli.typescript4s
 
+import com.zaneli.typescript4s.ScriptEvaluator.createSourceFile
 import java.io.File
 import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.duration.Duration
 
 private[typescript4s] object ScriptableObjectHelper {
 
-  private[typescript4s] def setHost(
-    cx: Context,
-    scope: Scriptable,
-    outputFiles: scala.collection.mutable.ListBuffer[File]): Unit = {
-    val ts4sHost = cx.newObject(scope)
+  private[typescript4s] def createHost(cx: Context, scope: Scriptable): Scriptable = {
+    val defaultLibCache: Map[(String, ECMAVersion), Future[_]] = Map(
+      (ScriptResources.libDTs.name, ECMAVersion.ES3) -> Future(createSourceFile(
+        scope, ScriptResources.libDTs.name, ScriptResources.libDTs.content, ECMAVersion.ES3)),
+      (ScriptResources.libDTs.name, ECMAVersion.ES5) -> Future(createSourceFile(
+        scope, ScriptResources.libDTs.name, ScriptResources.libDTs.content, ECMAVersion.ES5)),
+      (ScriptResources.libES6DTs.name, ECMAVersion.ES6) -> Future(createSourceFile(
+        scope, ScriptResources.libES6DTs.name, ScriptResources.libES6DTs.content, ECMAVersion.ES6)))
 
+    val ts4sHost = cx.newObject(scope)
     putProperty(ts4sHost, "getDefaultLibFilename", function({ options =>
       val target = options.asInstanceOf[NativeObject].get("target").asInstanceOf[Integer]
       if (target == ECMAVersion.ES6.code) {
@@ -27,26 +35,29 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(ts4sHost, "getNewLine", function({ () =>
       System.getProperty("line.separator")
     }))
+    putProperty(ts4sHost, "getCurrentDirectory", function({ () =>
+      new File("").getCanonicalPath
+    }))
+    putProperty(ts4sHost, "getSourceFile", function({ (filename, languageVersion, onError) =>
+      val fileName = filename.toString
+      val version = ECMAVersion(languageVersion.asInstanceOf[Integer])
+      defaultLibCache.get((fileName, version)).map(Await.result(_, Duration.Inf)).getOrElse {
+        val text = FileUtils.readFileToString(new File(fileName))
+        createSourceFile(cx, scope, fileName, text, version)
+      }
+    }))
+    ts4sHost
+  }
+
+  private[typescript4s] def addRuntimeInfo(
+    ts4sHost: Scriptable,
+    scope: Scriptable,
+    outputFiles: scala.collection.mutable.ListBuffer[File]): Unit = {
     putProperty(ts4sHost, "writeFile", function({ (fileName, data, writeByteOrderMark, onError) =>
       val file = new File(fileName.toString)
       outputFiles += file
       FileUtils.writeStringToFile(file, data.toString)
     }))
-    putProperty(ts4sHost, "getCurrentDirectory", function({ () =>
-      new File("").getCanonicalPath
-    }))
-    putProperty(ts4sHost, "getSourceFile", function({ (filename, languageVersion, onError) =>
-      val text = filename.toString match {
-        case ScriptResources.libDTs.name => ScriptResources.libDTs.content
-        case ScriptResources.libES6DTs.name => ScriptResources.libES6DTs.content
-        case name => FileUtils.readFileToString(new File(name))
-      }
-      scope.put("filename", scope, filename)
-      scope.put("text", scope, text)
-      scope.put("languageVersion", scope, languageVersion)
-      cx.evaluateString(scope, """ts.createSourceFile(filename, text, languageVersion, "0")""", "createSourceFile.js")
-    }))
-
     put(VarName.ts4sHost, ts4sHost, scope)
   }
 

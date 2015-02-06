@@ -10,16 +10,16 @@ import scala.collection.JavaConversions._
 
 private[typescript4s] object ScriptEvaluator {
   private[this] lazy val contextFactory = new ContextFactory()
-  private[this] lazy val globalScope = init()
+  private[this] lazy val (globalScope, ts4sHost) = init()
 
-  private[this] def init(): Scriptable = withContext { cx =>
+  private[this] def init(): (Scriptable, Scriptable) = withContext { cx =>
     cx.setOptimizationLevel(-1)
     cx.setLanguageVersion(Context.VERSION_1_7)
     val global = new Global()
     global.init(cx)
     val scope = cx.initStandardObjects(global)
     cx.evaluateString(scope, ScriptResources.typescriptServices.content, ScriptResources.typescriptServices.name)
-    scope
+    (scope, createHost(cx, scope))
   }
 
   private[this] def withContext[A](f: Context => A): A = try {
@@ -37,7 +37,7 @@ private[typescript4s] object ScriptEvaluator {
 
     withContext { cx =>
       val executeScope = cx.newObject(globalScope)
-      setHost(cx, executeScope, outputFiles)
+      addRuntimeInfo(ts4sHost, executeScope, outputFiles)
       setCompilerOptions(cx, executeScope, options)
       putProperty(
         executeScope,
@@ -90,4 +90,19 @@ private[typescript4s] object ScriptEvaluator {
     }
     outputFiles.toList
   }
+
+  private[typescript4s] def createSourceFile(
+    scope: Scriptable, filename: String, text: String, version: ECMAVersion): Object = {
+    withContext(createSourceFile(_, scope, filename, text, version))
+  }
+
+  private[typescript4s] def createSourceFile(
+    cx: Context, scope: Scriptable, filename: String, text: String, version: ECMAVersion): Object = {
+    val tmpScope = cx.newObject(scope)
+    tmpScope.put("filename", tmpScope, filename)
+    tmpScope.put("text", tmpScope, text)
+    tmpScope.put("languageVersion", tmpScope, version.code)
+    cx.evaluateString(tmpScope, """ts.createSourceFile(filename, text, languageVersion, "0")""", "createSourceFile.js")
+  }
+
 }
