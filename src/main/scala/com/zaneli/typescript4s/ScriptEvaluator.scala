@@ -19,6 +19,7 @@ private[typescript4s] object ScriptEvaluator {
     global.init(cx)
     val scope = cx.initStandardObjects(global)
     cx.evaluateString(scope, ScriptResources.typescriptServices.content, ScriptResources.typescriptServices.name)
+    addUtil(cx, scope)
     (scope, createHost(cx, scope))
   }
 
@@ -104,5 +105,4 @@ private[typescript4s] object ScriptEvaluator {
     tmpScope.put("languageVersion", tmpScope, version.code)
     cx.evaluateString(tmpScope, """ts.createSourceFile(filename, text, languageVersion, "0")""", "createSourceFile.js")
   }
-
 }

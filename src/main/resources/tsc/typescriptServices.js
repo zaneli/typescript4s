@@ -17774,6 +17774,9 @@ var ts;
             }
         }
         function checkSourceFile(node) {
+            if (ts4sUtil.isDefaultLib(node.filename)) {
+                return;
+            }
             var links = getNodeLinks(node);
             if (!(links.flags & 1 /* TypeChecked */)) {
                 emitExtends = false;

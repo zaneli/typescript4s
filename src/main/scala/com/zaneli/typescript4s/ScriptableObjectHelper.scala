@@ -11,6 +11,15 @@ import scala.concurrent.duration.Duration
 
 private[typescript4s] object ScriptableObjectHelper {
 
+  private[typescript4s] def addUtil(cx: Context, scope: Scriptable): Unit = {
+    val ts4sUtil = cx.newObject(scope)
+    putProperty(ts4sUtil, "isDefaultLib", function({ filename =>
+      val fileName = filename.toString
+      fileName == ScriptResources.libDTs.name || fileName == ScriptResources.libES6DTs.name
+    }))
+    put(VarName.ts4sUtil, ts4sUtil, scope)
+  }
+
   private[typescript4s] def createHost(cx: Context, scope: Scriptable): Scriptable = {
     val defaultLibCache: Map[(String, ECMAVersion), Future[_]] = Map(
       (ScriptResources.libDTs.name, ECMAVersion.ES3) -> Future(createSourceFile(
@@ -118,6 +127,7 @@ private[typescript4s] object ScriptableObjectHelper {
 
   private[this] object VarName {
     val ts4sHost = "ts4sHost"
+    val ts4sUtil = "ts4sUtil"
     val ts4sCompileOptions = "ts4sCompileOptions"
   }
 }
