@@ -33,12 +33,12 @@ private[typescript4s] object ScriptEvaluator {
     Context.exit()
   }
 
-  private[typescript4s] def compile(src: Seq[File], options: CompileOptions): Seq[File] = {
-    val outputFiles: scala.collection.mutable.ListBuffer[File] = new scala.collection.mutable.ListBuffer()
+  private[typescript4s] def compile(src: Seq[File], options: CompileOptions): (Seq[File], Seq[File]) = {
+    val destFiles: scala.collection.mutable.ListBuffer[File] = new scala.collection.mutable.ListBuffer()
 
-    withContext { cx =>
+    val srcFiles = withContext { cx =>
       val executeScope = cx.newObject(globalScope)
-      addRuntimeInfo(ts4sHost, executeScope, outputFiles)
+      addRuntimeInfo(ts4sHost, executeScope, destFiles)
       setCompilerOptions(cx, executeScope, options)
       putProperty(
         executeScope,
@@ -78,6 +78,12 @@ private[typescript4s] object ScriptEvaluator {
             var category = ts.DiagnosticCategory[diagnostic.category].toLowerCase();
             errorMsg += category + " TS" + diagnostic.code + ": " + diagnostic.messageText;
         }
+        
+        var srcFiles = program.getSourceFiles().filter(function (f) {
+            return !ts4sUtil.isDefaultLib(f.filename);
+        }).map(function (f) {
+            return ts4sHost.getCanonicalFileName(f.filename);
+        });
         """,
         "compile.js")
       val errorMsg = executeScope.get("errorMsg", executeScope).toString
@@ -88,8 +94,11 @@ private[typescript4s] object ScriptEvaluator {
       if (exitStatus != 0) {
         throw new TypeScriptCompilerException(s"invalid exitStatus: ${exitStatus}")
       }
+      executeScope.get("srcFiles", executeScope).asInstanceOf[NativeArray].toArray.map {
+        f => new File(f.toString)
+      }
     }
-    outputFiles.toList
+    (srcFiles.toList, destFiles.toList)
   }
 
   private[typescript4s] def createSourceFile(

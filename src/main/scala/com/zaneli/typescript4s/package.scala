@@ -1,8 +1,18 @@
 package com.zaneli
 
+import akka.actor.ActorSystem
+import akka.util.Timeout
 import org.mozilla.javascript.{ Context, Scriptable }
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 package object typescript4s {
+
+  private[typescript4s] val as = ActorSystem.create()
+  sys addShutdownHook {
+    as.shutdown()
+  }
+  implicit val timeout = Timeout(10 minutes)
 
   private[typescript4s]type SourceFile = Object
 

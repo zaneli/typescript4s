@@ -37,7 +37,7 @@ private[typescript4s] object ScriptableObjectHelper {
     }
     def readCache(fileName: String, version: ECMAVersion): Option[SourceFile] = {
       val file = new File(fileName)
-      fileCache.get((file.getCanonicalPath, version)) map {
+      fileCache.get((file.getCanonicalPath, version)) collect {
         case (sourceFile, lastModified) if file.lastModified == lastModified => sourceFile
       }
     }
@@ -77,10 +77,10 @@ private[typescript4s] object ScriptableObjectHelper {
   private[typescript4s] def addRuntimeInfo(
     ts4sHost: Scriptable,
     scope: Scriptable,
-    outputFiles: scala.collection.mutable.ListBuffer[File]): Unit = {
+    destFiles: scala.collection.mutable.ListBuffer[File]): Unit = {
     putProperty(ts4sHost, "writeFile", function({ (fileName, data, writeByteOrderMark, onError) =>
       val file = new File(fileName.toString)
-      outputFiles += file
+      destFiles += file
       FileUtils.writeStringToFile(file, data.toString)
     }))
     put(VarName.ts4sHost, ts4sHost, scope)
