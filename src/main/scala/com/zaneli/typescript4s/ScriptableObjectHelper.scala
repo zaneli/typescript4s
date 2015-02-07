@@ -5,6 +5,7 @@ import java.io.File
 import org.apache.commons.io.FileUtils
 import org.mozilla.javascript.{ BaseFunction, Context, NativeObject, Scriptable, Undefined }
 import org.mozilla.javascript.ScriptableObject.putProperty
+import scala.collection.mutable.{ Map => MutableMap }
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.Duration
@@ -21,13 +22,25 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def createHost(cx: Context, scope: Scriptable): Scriptable = {
-    val defaultLibCache: Map[(String, ECMAVersion), Future[_]] = Map(
+    val defaultLibCache: Map[(String, ECMAVersion), Future[SourceFile]] = Map(
       (ScriptResources.libDTs.name, ECMAVersion.ES3) -> Future(createSourceFile(
         scope, ScriptResources.libDTs.name, ScriptResources.libDTs.content, ECMAVersion.ES3)),
       (ScriptResources.libDTs.name, ECMAVersion.ES5) -> Future(createSourceFile(
         scope, ScriptResources.libDTs.name, ScriptResources.libDTs.content, ECMAVersion.ES5)),
       (ScriptResources.libES6DTs.name, ECMAVersion.ES6) -> Future(createSourceFile(
         scope, ScriptResources.libES6DTs.name, ScriptResources.libES6DTs.content, ECMAVersion.ES6)))
+
+    val fileCache: MutableMap[(String, ECMAVersion), (SourceFile, Long)] = MutableMap()
+
+    def readDefaultLib(fileName: String, version: ECMAVersion): Option[SourceFile] = {
+      defaultLibCache.get((fileName, version)) map (Await.result(_, Duration.Inf))
+    }
+    def readCache(fileName: String, version: ECMAVersion): Option[SourceFile] = {
+      val file = new File(fileName)
+      fileCache.get((file.getCanonicalPath, version)) map {
+        case (sourceFile, lastModified) if file.lastModified == lastModified => sourceFile
+      }
+    }
 
     val ts4sHost = cx.newObject(scope)
     putProperty(ts4sHost, "getDefaultLibFilename", function({ options =>
@@ -50,9 +63,12 @@ private[typescript4s] object ScriptableObjectHelper {
     putProperty(ts4sHost, "getSourceFile", function({ (filename, languageVersion, onError) =>
       val fileName = filename.toString
       val version = ECMAVersion(languageVersion.asInstanceOf[Integer])
-      defaultLibCache.get((fileName, version)).map(Await.result(_, Duration.Inf)).getOrElse {
-        val text = FileUtils.readFileToString(new File(fileName))
-        createSourceFile(cx, scope, fileName, text, version)
+      readDefaultLib(fileName, version) orElse readCache(fileName, version) getOrElse {
+        val file = new File(fileName)
+        val text = FileUtils.readFileToString(file)
+        val sourceFile = createSourceFile(cx, scope, fileName, text, version)
+        fileCache.put((file.getCanonicalPath, version), (sourceFile, file.lastModified))
+        sourceFile
       }
     }))
     ts4sHost
