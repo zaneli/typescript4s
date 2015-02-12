@@ -6048,7 +6048,9 @@ var ts;
                     syntacticDiagnostics = sourceFile.referenceDiagnostics.concat(sourceFile.parseDiagnostics);
                 }
                 else {
-                    checkGrammar(sourceText, languageVersion, sourceFile);
+                    if (!ts4sUtil.isDefaultLib(filename)) {
+                        checkGrammar(sourceText, languageVersion, sourceFile);
+                    }
                     syntacticDiagnostics = sourceFile.referenceDiagnostics.concat(sourceFile.grammarDiagnostics);
                 }
             }
