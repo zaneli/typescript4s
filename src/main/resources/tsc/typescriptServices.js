@@ -7127,7 +7127,9 @@ var ts;
         var commonSourceDirectory;
         ts.forEach(rootNames, function (name) { return processRootFile(name, false); });
         if (!seenNoDefaultLib) {
-            processRootFile(host.getDefaultLibFilename(options), true);
+            host.getDefaultLibFilenames(options).forEach(function (filename) {
+                processRootFile(filename, true);
+            });
         }
         verifyCompilerOptions();
         errors.sort(ts.compareDiagnostics);

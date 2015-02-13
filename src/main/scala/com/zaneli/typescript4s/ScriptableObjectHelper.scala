@@ -16,19 +16,25 @@ private[typescript4s] object ScriptableObjectHelper {
     val ts4sUtil = cx.newObject(scope)
     putProperty(ts4sUtil, "isDefaultLib", function({ filename =>
       val fileName = filename.toString
-      fileName == ScriptResources.libDTs.name || fileName == ScriptResources.libES6DTs.name
+      ScriptResources.defaultLibNames.exists(_ == fileName)
     }))
     put(VarName.ts4sUtil, ts4sUtil, scope)
   }
 
   private[typescript4s] def createHost(cx: Context, scope: Scriptable): Scriptable = {
-    val defaultLibCache: Map[(String, ECMAVersion), Future[SourceFile]] = Map(
-      (ScriptResources.libDTs.name, ECMAVersion.ES3) -> Future(createSourceFile(
-        scope, ScriptResources.libDTs.name, ScriptResources.libDTs.content, ECMAVersion.ES3)),
-      (ScriptResources.libDTs.name, ECMAVersion.ES5) -> Future(createSourceFile(
-        scope, ScriptResources.libDTs.name, ScriptResources.libDTs.content, ECMAVersion.ES5)),
-      (ScriptResources.libES6DTs.name, ECMAVersion.ES6) -> Future(createSourceFile(
-        scope, ScriptResources.libES6DTs.name, ScriptResources.libES6DTs.content, ECMAVersion.ES6)))
+    val defaultLibCache: Map[(String, ECMAVersion), Future[SourceFile]] =
+      (ScriptResources.libDTss.map { resource =>
+        (resource.name, ECMAVersion.ES3) ->
+          Future(createSourceFile(scope, resource.name, resource.content, ECMAVersion.ES3))
+      }).toMap ++
+        (ScriptResources.libDTss.map { resource =>
+          (resource.name, ECMAVersion.ES5) ->
+            Future(createSourceFile(scope, resource.name, resource.content, ECMAVersion.ES5))
+        }).toMap ++
+        (ScriptResources.libES6DTss.map { resource =>
+          (resource.name, ECMAVersion.ES6) ->
+            Future(createSourceFile(scope, resource.name, resource.content, ECMAVersion.ES6))
+        }).toMap
 
     val fileCache: MutableMap[(String, ECMAVersion), (SourceFile, Long)] = MutableMap()
 
@@ -49,6 +55,14 @@ private[typescript4s] object ScriptableObjectHelper {
         ScriptResources.libES6DTs.name
       } else {
         ScriptResources.libDTs.name
+      }
+    }))
+    putProperty(ts4sHost, "getDefaultLibFilenames", function({ options =>
+      val target = options.asInstanceOf[NativeObject].get("target").asInstanceOf[Integer]
+      if (target == ECMAVersion.ES6.code) {
+        cx.newArray(scope, ScriptResources.libES6DTss.map(_.name).toArray: Array[Object])
+      } else {
+        cx.newArray(scope, ScriptResources.libDTss.map(_.name).toArray: Array[Object])
       }
     }))
     putProperty(ts4sHost, "getCanonicalFileName", function({ fileName =>
