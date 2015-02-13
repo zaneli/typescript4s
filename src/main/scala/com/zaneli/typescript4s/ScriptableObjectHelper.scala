@@ -22,19 +22,19 @@ private[typescript4s] object ScriptableObjectHelper {
   }
 
   private[typescript4s] def createHost(cx: Context, scope: Scriptable): Scriptable = {
-    val defaultLibCache: Map[(String, ECMAVersion), Future[SourceFile]] =
-      (ScriptResources.libDTss.map { resource =>
-        (resource.name, ECMAVersion.ES3) ->
-          Future(createSourceFile(scope, resource.name, resource.content, ECMAVersion.ES3))
-      }).toMap ++
-        (ScriptResources.libDTss.map { resource =>
-          (resource.name, ECMAVersion.ES5) ->
-            Future(createSourceFile(scope, resource.name, resource.content, ECMAVersion.ES5))
-        }).toMap ++
-        (ScriptResources.libES6DTss.map { resource =>
-          (resource.name, ECMAVersion.ES6) ->
-            Future(createSourceFile(scope, resource.name, resource.content, ECMAVersion.ES6))
-        }).toMap
+    def createDefaultLibSourceFile(version: ECMAVersion): Map[(String, ECMAVersion), Future[SourceFile]] = {
+      val resources = if (version == ECMAVersion.ES6) {
+        ScriptResources.libES6DTss
+      } else {
+        ScriptResources.libDTss
+      }
+      resources.map { resource =>
+        (resource.name, version) ->
+          Future(createSourceFile(scope, resource.name, resource.content, version))
+      }.toMap
+    }
+
+    val defaultLibCache: MutableMap[(String, ECMAVersion), Future[SourceFile]] = MutableMap()
 
     val fileCache: MutableMap[(String, ECMAVersion), (SourceFile, Long)] = MutableMap()
 
@@ -49,6 +49,12 @@ private[typescript4s] object ScriptableObjectHelper {
     }
 
     val ts4sHost = cx.newObject(scope)
+    putProperty(ts4sHost, "prepareDefaultLibSourceFile", function({ languageVersion =>
+      val version = ECMAVersion(languageVersion.asInstanceOf[Integer])
+      if (!defaultLibCache.keySet.exists { case (_, v) => v == version }) {
+        defaultLibCache ++= createDefaultLibSourceFile(version)
+      }
+    }))
     putProperty(ts4sHost, "getDefaultLibFilename", function({ options =>
       val target = options.asInstanceOf[NativeObject].get("target").asInstanceOf[Integer]
       if (target == ECMAVersion.ES6.code) {

@@ -47,6 +47,8 @@ private[typescript4s] object ScriptEvaluator {
       cx.evaluateString(
         executeScope,
         """
+        ts4sHost.prepareDefaultLibSourceFile(ts4sCompileOptions.target);
+        
         var program = ts.createProgram(fileNames, ts4sCompileOptions, ts4sHost);
         var errors = program.getDiagnostics();
         var exitStatus;
